@@ -31,6 +31,9 @@
   changed_when: compose_up.stderr is search('Created|Recreated|Started')
   when: not ansible_check_mode
 
+- name: Start the stack after a boot
+  ansible.builtin.import_tasks: boot.yml
+
 - name: Probe on, with its app logins (-e probe=on)
   ansible.builtin.import_tasks: probe-on.yml
   when: probe == "on" and not ansible_check_mode

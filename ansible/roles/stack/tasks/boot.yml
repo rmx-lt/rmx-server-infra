@@ -1,0 +1,21 @@
+# After a reboot Docker restarts the containers that were running, but not one
+# that exited by itself during shutdown (wiki Server-Changelog 2026-11-02:
+# Mosquitto). This unit runs `docker compose up -d` at every boot.
+
+- name: Boot unit
+  ansible.builtin.copy:
+    src: "{{ services_dir }}/rmx-stack.service"
+    remote_src: true
+    dest: /etc/systemd/system/rmx-stack.service
+    mode: "0644"
+  register: stack_unit
+
+- name: Systemd reads the boot unit
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: stack_unit.changed
+
+- name: Start the stack after every boot
+  ansible.builtin.systemd_service:
+    name: rmx-stack.service
+    enabled: true

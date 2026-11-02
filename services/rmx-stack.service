@@ -1,0 +1,19 @@
+[Unit]
+Description=Start the rmx Docker Compose stack after boot
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+# Docker brings back containers that were running at shutdown. One that exited
+# on its own while the host shut down (Mosquitto, 2026-11-02) stays down, so
+# compose up -d starts whatever is missing. Probe containers keep their own
+# restart policy: no --profile here, so a probe that is off stays off.
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/rmx-vps/services
+ExecStart=/usr/bin/docker compose up -d
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
