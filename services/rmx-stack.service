@@ -21,10 +21,9 @@ Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/rmx-vps/services
 ExecStart=/usr/bin/docker compose up -d --no-recreate
-# The probe (profile "probe") is off unless the playbook ran with
-# -e probe=on. Start its containers only if they exist; "-" ignores the
-# error when there are none.
-ExecStartPost=-/usr/bin/docker compose --profile probe start
+# No --profile probe: the probe is switched on and off by hand (wiki
+# Server §10), so a stopped probe must stay stopped (#47). Its containers
+# rely on restart: unless-stopped.
 TimeoutStartSec=300
 
 [Install]
