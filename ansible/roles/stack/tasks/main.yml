@@ -31,6 +31,21 @@
   changed_when: compose_up.stderr is search('Created|Recreated|Started')
   when: not ansible_check_mode
 
+# Docker's restart policy alone left Mosquitto down after a reboot (#37).
+- name: Boot unit that starts the stack
+  ansible.builtin.copy:
+    src: "{{ services_dir }}/rmx-stack.service"
+    remote_src: true
+    dest: /etc/systemd/system/rmx-stack.service
+    mode: "0644"
+  register: stack_unit
+
+- name: Start the stack after every boot
+  ansible.builtin.systemd_service:
+    name: rmx-stack.service
+    enabled: true
+    daemon_reload: "{{ stack_unit.changed }}"
+
 - name: Probe on, with its app logins (-e probe=on)
   ansible.builtin.import_tasks: probe-on.yml
   when: probe == "on" and not ansible_check_mode
