@@ -1,0 +1,31 @@
+# Starts the Docker Compose stack in /opt/rmx-vps/services after every boot.
+#
+# Containers have `restart: unless-stopped`, but that is not enough: on
+# 2026-11-02 the nightly auto-reboot (04:30) left Mosquitto stopped. It
+# exited on its own (code 0) during shutdown, so Docker treated it as stopped
+# by hand and didn't bring it back (rmx-vps#37). This unit starts whatever
+# is not running. --no-recreate: it never changes a running container or
+# applies new config (that's the playbook's job), it only starts and, if a
+# container is missing, creates it.
+#
+# Installed by the playbook (roles/stack). Safe to run by hand:
+#   sudo systemctl start rmx-stack
+[Unit]
+Description=Start the rmx Docker Compose stack
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/rmx-vps/services
+ExecStart=/usr/bin/docker compose up -d --no-recreate
+# The probe (profile "probe") is off unless the playbook ran with
+# -e probe=on. Start its containers only if they exist; "-" ignores the
+# error when there are none.
+ExecStartPost=-/usr/bin/docker compose --profile probe start
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
