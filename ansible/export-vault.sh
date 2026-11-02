@@ -52,7 +52,6 @@ pairs() { awk 'NF==2 {print "  " $1 ": " $2}' "$1" 2>/dev/null || true; }
 	fi
 	echo
 	echo "vault_probe_db_password: $(sed -n 's/^PROBE_DB_PASSWORD=//p' "$SERVICES/probe/.env" 2>/dev/null | head -1 | grep . || echo change-me)"
-	echo "vault_probe_tag: $(sed -n 's/^PROBE_TAG=//p' "$SERVICES/probe/.env" 2>/dev/null || echo sha-0000000)"
 	echo "vault_probe_app_users:"
 	awk '$1=="app-login" {print "  " $2 ": " $3}' "$SERVICES/probe/data/credentials.txt" 2>/dev/null || true
 	echo

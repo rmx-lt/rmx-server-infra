@@ -31,9 +31,8 @@ vault_caddy_fw_users:
     hash: $2a$14$...
 
 # rmx-backend-probe: database password (letters and digits only, it goes
-# into a URL), the image tag to start from, and the app's own logins.
+# into a URL) and the app's own logins.
 vault_probe_db_password: change-me
-vault_probe_tag: sha-0000000
 vault_probe_app_users:
   probe: change-me
   probe-device: change-me

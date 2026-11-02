@@ -11,7 +11,6 @@ vault_caddy_fw_users:
     password: test-only
     hash: $2a$14$poDv4C58sAS6guLjjf2xou.OeDfA2Vsh7dT6CU8ygb64XglMt9aAu
 vault_probe_db_password: testonly
-vault_probe_tag: sha-0000000
 vault_probe_app_users:
   probe: test-only
   probe-device: test-only

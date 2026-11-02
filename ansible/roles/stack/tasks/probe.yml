@@ -9,7 +9,7 @@
     group: root
     mode: "0755"
 
-# Created on the first run with the image tag from the vault; later runs
+# Created on the first run (image tag `production`, see the template); later runs
 # only keep the passwords in line. PROBE_TAG belongs to the deploy script.
 - name: Probe env file
   ansible.builtin.template:
