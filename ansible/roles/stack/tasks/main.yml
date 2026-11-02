@@ -45,6 +45,8 @@
     name: rmx-stack.service
     enabled: true
     daemon_reload: "{{ stack_unit.changed }}"
+  # In --check the unit isn't written yet, so systemd can't find it (#43).
+  when: not (ansible_check_mode and stack_unit.changed)
 
 - name: Probe on, with its app logins (-e probe=on)
   ansible.builtin.import_tasks: probe-on.yml
