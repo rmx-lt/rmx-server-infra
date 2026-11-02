@@ -67,11 +67,11 @@ write_tag() {
 wait_healthy() {
 	local status="" i
 	for ((i = 0; i < HEALTH_TIMEOUT; i += 3)); do
-		status=$(docker inspect -f '{{.State.Health.Status}}' probe-app 2>/dev/null || echo missing)
+		status=$(compose ps --format '{{.Health}}' probe-app 2>/dev/null || true)
 		[[ $status == healthy ]] && return 0
 		sleep 3
 	done
-	log "probe-app is '$status' after ${HEALTH_TIMEOUT}s"
+	log "probe-app is '${status:-missing}' after ${HEALTH_TIMEOUT}s"
 	return 1
 }
 
@@ -82,10 +82,11 @@ if ! docker pull -q "$IMAGE:$TAG" >/dev/null; then
 	exit 1
 fi
 
-RUNNING=$(docker inspect -f '{{.State.Running}}' probe-app 2>/dev/null || echo false)
+# Containers are found through Compose by service name, not container name (#41).
+RUNNING=$(compose ps -q --status running probe-app 2>/dev/null || true)
 write_tag "$TAG"
 
-if [[ $RUNNING != true ]]; then
+if [[ -z $RUNNING ]]; then
 	log "OK $TAG: recorded and pulled; the probe is off, so nothing was started"
 	exit 0
 fi

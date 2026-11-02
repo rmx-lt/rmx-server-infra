@@ -18,7 +18,6 @@
 services:
   probe-db:
     image: timescale/timescaledb:2.30.2-pg17
-    container_name: probe-db
     profiles: [probe]
     restart: unless-stopped
     mem_limit: 256m
@@ -67,7 +66,6 @@ services:
 
   probe-app:
     image: ghcr.io/rmx-lt/rmx-backend-probe:${PROBE_TAG}
-    container_name: probe-app
     profiles: [probe]
     restart: unless-stopped
     mem_limit: 64m
