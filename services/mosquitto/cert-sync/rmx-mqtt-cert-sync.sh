@@ -15,7 +15,6 @@ DOMAIN=mqtt.rmx.lt
 SERVICES=/opt/rmx-vps/services
 CADDY_CERTS=$SERVICES/caddy/data/data/caddy/certificates
 DEST=$SERVICES/mosquitto/data/certs
-CONTAINER=rmx-mosquitto-1
 MQTT_UID=1883
 
 # Caddy keeps one folder per CA (normally Let's Encrypt; ZeroSSL is its
@@ -45,7 +44,9 @@ mv -f "$DEST/.fullchain.pem.new" "$DEST/fullchain.pem"
 mv -f "$DEST/.privkey.pem.new" "$DEST/privkey.pem"
 echo "Installed new certificate for $DOMAIN: $(openssl x509 -in "$DEST/fullchain.pem" -noout -enddate)"
 
-if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" = true ]; then
-	docker kill --signal HUP "$CONTAINER" >/dev/null
-	echo "Sent SIGHUP to $CONTAINER"
+# Through Compose by service name, not container name (#41).
+compose() { docker compose -f "$SERVICES/compose.yaml" "$@"; }
+if [ -n "$(compose ps -q --status running mosquitto 2>/dev/null)" ]; then
+	compose kill -s HUP mosquitto 2>/dev/null
+	echo "Sent SIGHUP to mosquitto"
 fi

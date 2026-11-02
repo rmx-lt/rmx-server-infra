@@ -24,7 +24,7 @@ vault_mosquitto_users:
   probe-device: change-me
 
 # Download logins for /fw/* (HTTP basic auth). hash = bcrypt of password:
-#   docker exec rmx-caddy-1 caddy hash-password --plaintext "$P"
+#   cd /opt/rmx-vps/services && docker compose exec caddy caddy hash-password --plaintext "$P"
 vault_caddy_fw_users:
   - name: probe-device
     password: change-me

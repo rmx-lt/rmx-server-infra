@@ -1,23 +1,28 @@
 #!/bin/bash
 # rmx-ci backup -> change the data -> rmx-ci restore, against a throwaway
-# TimescaleDB container named like the real one (probe-db). Needs Docker and
-# root. Run from the repo: sudo ansible/test/db-roundtrip.sh
+# probe-db started from the real services/compose.yaml (rmx-ci finds it
+# through Compose by service name, #41). Needs Docker and root.
+# Run from the repo: sudo ansible/test/db-roundtrip.sh
 set -euo pipefail
 
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 CI=$REPO/ansible/ci/rmx-ci.sh
-IMAGE=$(sed -n 's/^ *image: \(timescale\/timescaledb:.*\)/\1/p' "$REPO/services/probe/compose.yaml")
+ENV_FILE=$REPO/services/probe/.env
+[[ -e $ENV_FILE ]] && { echo "refusing: $ENV_FILE exists (not a test checkout?)" >&2; exit 1; }
 WORK=$(mktemp -d)
-trap 'docker rm -f probe-db >/dev/null 2>&1 || true; rm -rf "$WORK" "$REPO/services/mosquitto/data" "$REPO/services/caddy/firmware"' EXIT
+compose() { docker compose -f "$REPO/services/compose.yaml" --profile probe "$@"; }
+cleanup() {
+	compose down -v >/dev/null 2>&1 || true
+	rm -rf "$WORK" "$ENV_FILE" "$REPO/services/probe/data" "$REPO/services/mosquitto/data" "$REPO/services/caddy/firmware"
+}
+trap cleanup EXIT
 
-psql() { docker exec -i probe-db psql -U probe -d "${DB:-probe}" -v ON_ERROR_STOP=1 -tA "$@"; }
+psql() { compose exec -T probe-db psql -U probe -d "${DB:-probe}" -v ON_ERROR_STOP=1 -tA "$@"; }
 
-docker rm -f probe-db >/dev/null 2>&1 || true
-docker run -d --name probe-db -e POSTGRES_USER=probe -e POSTGRES_DB=probe \
-	-e POSTGRES_PASSWORD=test -e NO_TS_TUNE=true "$IMAGE" >/dev/null
-for _ in $(seq 60); do docker exec probe-db pg_isready -U probe -q && break; sleep 1; done
+printf 'PROBE_DB_PASSWORD=test\nPROBE_MQTT_PASSWORD=test\nPROBE_TAG=sha-0000000\n' >"$ENV_FILE"
+compose up -d --wait probe-db
 sleep 3 # the image restarts postgres once after its init scripts
-for _ in $(seq 60); do docker exec probe-db pg_isready -U probe -q && break; sleep 1; done
+for _ in $(seq 60); do compose exec -T probe-db pg_isready -U probe -q && break; sleep 1; done
 
 psql -q -c "CREATE EXTENSION IF NOT EXISTS timescaledb" \
 	-c "CREATE TABLE readings(ts timestamptz NOT NULL, v int)" \
