@@ -115,7 +115,7 @@ $j = Start-Sub ($m1 + @('-i', 'first')) 'mower/mower-01/cmd'
 $null = Stop-Sub $j 3
 # Filtered here, not with grep on the server: Windows PowerShell 5.1 mangles
 # double quotes inside native-command arguments.
-$log = ssh -o BatchMode=yes rmx-vps 'docker logs --since 30s rmx-mosquitto-1 2>&1' |
+$log = ssh -o BatchMode=yes rmx-vps 'docker compose -f /opt/rmx-vps/services/compose.yaml logs --no-log-prefix --since 30s mosquitto 2>&1' |
     Select-String -Pattern 'already connected|closing old|session taken over' |
     Select-Object -Last 2 | ForEach-Object { $_.Line -replace '\d+\.\d+\.\d+\.\d+', 'PC-IP' }
 Result 'client ID forced to username' ("$log" -match 'mower-01') "server log: $log"

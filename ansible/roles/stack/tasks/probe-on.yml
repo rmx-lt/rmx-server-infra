@@ -8,7 +8,8 @@
   changed_when: probe_up.stderr is search('Created|Recreated|Started')
 
 - name: Wait until probe-app is healthy
-  ansible.builtin.command: docker inspect -f '{{ '{{' }}.State.Health.Status{{ '}}' }}' probe-app
+  ansible.builtin.command: docker compose --profile probe ps --format '{{ '{{' }}.Health{{ '}}' }}' probe-app
+  args: { chdir: "{{ services_dir }}" }
   register: probe_health
   until: probe_health.stdout == 'healthy'
   retries: 30

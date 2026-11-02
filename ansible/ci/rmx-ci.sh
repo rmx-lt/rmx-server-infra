@@ -13,7 +13,6 @@ set -euo pipefail
 REPO=${RMX_REPO:-/opt/rmx-vps}
 ADMIN=${RMX_ADMIN:-rmx}
 BRANCH=production
-DB_CONTAINER=probe-db
 DB_NAME=probe
 DB_USER=probe
 
@@ -26,15 +25,18 @@ mk_tmp() {
 	trap 'rm -rf "$TMP"' EXIT
 }
 
-running() { [[ $(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null) == true ]]; }
+# Services are addressed through Compose (by service name), never by
+# container name (#41). --profile probe: the probe services are visible too.
+compose() { docker compose -f "$REPO/services/compose.yaml" --profile probe "$@"; }
+running() { [[ -n $(compose ps -q --status running "$1" 2>/dev/null) ]]; }
 
 backup() {
 	mk_tmp
-	if running "$DB_CONTAINER"; then
-		docker exec "$DB_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc >"$TMP/probe.dump"
+	if running probe-db; then
+		compose exec -T probe-db pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc >"$TMP/probe.dump"
 		log "database dumped ($(stat -c %s "$TMP/probe.dump") bytes)"
 	else
-		log "$DB_CONTAINER is not running: no database dump"
+		log "probe-db is not running: no database dump"
 	fi
 	# The raw database folder is skipped (a dump of a live one is not
 	# consistent); .git comes back with the next clone.
@@ -53,18 +55,18 @@ restore() {
 		"$rel/services/caddy/firmware" "$rel/services/probe/.env" 2>/dev/null || true
 
 	if [[ -f $TMP/probe.dump ]]; then
-		running "$DB_CONTAINER" || die "$DB_CONTAINER is not running (start the probe: ./bootstrap.sh -e probe=on)"
-		local app_was_up=false psql=(docker exec -i "$DB_CONTAINER" psql -U "$DB_USER" -v ON_ERROR_STOP=1 -q)
+		running probe-db || die "probe-db is not running (start the probe: ./bootstrap.sh -e probe=on)"
+		local app_was_up=false psql=(compose exec -T probe-db psql -U "$DB_USER" -v ON_ERROR_STOP=1 -q)
 		if running probe-app; then
 			app_was_up=true
-			docker stop probe-app >/dev/null
+			compose stop probe-app 2>/dev/null
 		fi
 		# A fresh database: the timescaledb restore procedure needs one.
 		"${psql[@]}" -d postgres -c "DROP DATABASE IF EXISTS $DB_NAME WITH (FORCE)" -c "CREATE DATABASE $DB_NAME"
 		"${psql[@]}" -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS timescaledb" -c "SELECT timescaledb_pre_restore()"
-		docker exec -i "$DB_CONTAINER" pg_restore -U "$DB_USER" -d "$DB_NAME" --no-owner <"$TMP/probe.dump"
+		compose exec -T probe-db pg_restore -U "$DB_USER" -d "$DB_NAME" --no-owner <"$TMP/probe.dump"
 		"${psql[@]}" -d "$DB_NAME" -c "SELECT timescaledb_post_restore()"
-		if $app_was_up; then docker start probe-app >/dev/null; fi
+		if $app_was_up; then compose start probe-app 2>/dev/null; fi
 		log "database restored"
 	else
 		log "no database dump in this backup"
@@ -94,13 +96,13 @@ restore() {
 	local store=$TMP/$rel/services/mosquitto/data/store
 	if [[ -d $store ]]; then
 		local dest=$REPO/services/mosquitto/data/store was_up=false
-		if running rmx-mosquitto-1; then
+		if running mosquitto; then
 			was_up=true
-			docker stop rmx-mosquitto-1 >/dev/null
+			compose stop mosquitto 2>/dev/null
 		fi
 		mkdir -p "$dest"
 		cp -a "$store/." "$dest/"
-		if $was_up; then docker start rmx-mosquitto-1 >/dev/null; fi
+		if $was_up; then compose start mosquitto 2>/dev/null; fi
 		log "mosquitto store restored"
 	fi
 }
