@@ -23,8 +23,12 @@ ADMIN=rmx
 [[ ${ID:-} == ubuntu && ${VERSION_ID:-} == 24.04 ]] || echo "Warning: written for Ubuntu 24.04, this is ${PRETTY_NAME:-unknown}." >&2
 
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y -qq git ansible-core python3-apt >/dev/null
+# A fresh image runs its first-boot update for a while: wait for the apt lock
+# instead of failing (#50).
+APT=(apt-get -o DPkg::Lock::Timeout=1200)
+echo "Installing git and Ansible (a few minutes; waits if apt is busy)..."
+"${APT[@]}" update -qq
+"${APT[@]}" install -y -qq git ansible-core python3-apt >/dev/null
 
 # The admin user owns the clone (read-only; wiki Server §9). Created here because
 # the clone comes first; the playbook sets up the rest of it.
