@@ -1,5 +1,5 @@
 # rmx-server-app-probe: a learning/diagnostic app (github.com/rmx-lt/rmx-server-app-probe)
-# and a rehearsal of the production deploy. See wiki Server §10 "Probe".
+# and a rehearsal of the production deploy. See wiki Server-Infra §10 "Probe".
 #
 # Compose profile "probe": OFF by default. A plain `docker compose up -d`
 # ignores these two services. Turn on / off:

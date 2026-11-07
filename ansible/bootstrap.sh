@@ -30,7 +30,7 @@ echo "Installing git and Ansible (a few minutes; waits if apt is busy)..."
 "${APT[@]}" update -qq
 "${APT[@]}" install -y -qq git ansible-core python3-apt >/dev/null
 
-# The admin user owns the clone (read-only; wiki Server §9). Created here because
+# The admin user owns the clone (read-only; wiki Server-Infra §9). Created here because
 # the clone comes first; the playbook sets up the rest of it.
 id "$ADMIN" &>/dev/null || useradd --create-home --shell /bin/bash "$ADMIN"
 

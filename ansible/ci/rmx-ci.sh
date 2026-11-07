@@ -5,7 +5,7 @@
 #     rmx-ci check:<sha>         fast-forward the repo to <sha>, ansible --check --diff
 #     rmx-ci apply:<sha>         fast-forward the repo to <sha>, run the playbook
 #   You, on the server, to get data back after a rebuild:
-#     sudo rmx-ci restore FILE   FILE = decrypted backup tar.gz (wiki Server §11)
+#     sudo rmx-ci restore FILE   FILE = decrypted backup tar.gz (wiki Server-Infra §11)
 # check / apply read the vault password from the first line of stdin; it only
 # lives in a root-only file on tmpfs for the length of the run.
 set -euo pipefail

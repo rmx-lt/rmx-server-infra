@@ -10,6 +10,7 @@ name: deploy
 on:
   push:
     branches: [production]
+    paths-ignore: ['wiki/**']
 
 # One deploy at a time; a newer push waits instead of cancelling a running apply.
 concurrency:
