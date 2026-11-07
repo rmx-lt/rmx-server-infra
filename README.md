@@ -23,3 +23,7 @@ ssh rmx-vps 'git -C /opt/rmx-vps pull --ff-only'     # after pushing a change fr
 ```
 
 Every change to the server gets a dated entry on the [Server-Changelog](https://github.com/rmx-lt/blade-of-grass/wiki/Server-Changelog) wiki page (what, why, backup, undo).
+
+## License
+
+Code and documentation are licensed under [Apache-2.0](LICENSE).
