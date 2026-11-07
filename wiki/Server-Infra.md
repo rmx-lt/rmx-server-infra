@@ -64,37 +64,6 @@ Host rmx-vps
 
 ---
 
-## 3. Server state found before setup
-
-- Only access: `root` + password (via keyboard-interactive/PAM).
-- `/etc/ssh/sshd_config` line 47 had **`PubkeyAuthentication no`** — keys were refused entirely.
-- `PermitRootLogin yes`, `KbdInteractiveAuthentication yes` (main file);
-  `/etc/ssh/sshd_config.d/60-cloudimg-settings.conf` had `PasswordAuthentication no`, but passwords still worked through keyboard-interactive.
-- No firewall (ufw inactive), no fail2ban.
-- Only public listener: sshd on port 22.
-- Packages already up to date; a reboot was pending (newer kernel).
-
----
-
-## 4. Changes made (in order)
-
-| # | Time (UTC) | Change |
-|---|---|---|
-| 1 | ~19:24 | Public key appended to `/root/.ssh/authorized_keys` (via password login) |
-| 2 | ~19:26 | `sshd_config` line 47 → `PubkeyAuthentication yes`, `systemctl reload ssh`. Backup: `/etc/ssh/sshd_config.bak-pubkey-off` (original file) |
-| 3 | ~19:28 | `apt-get update && apt-get upgrade` — nothing to upgrade (3 phased: apparmor, libapparmor1, open-vm-tools) |
-| 4 | ~19:29 | User `rmx` created (no password, shell `/bin/bash`, groups `sudo`) |
-| 5 | ~19:29 | `/etc/sudoers.d/rmx` = `rmx ALL=(ALL) NOPASSWD:ALL` (root:root, 0440, checked with `visudo -c`) |
-| 6 | ~19:29 | `/home/rmx/.ssh/authorized_keys` = same public key (rmx:rmx, dir 0700, file 0600) |
-| 7 | ~19:49 | SSH hardening (see §5). Backup: `/etc/ssh/sshd_config.bak-pre-hardening`. Tested with a 5-min auto-rollback timer (`ssh-rollback`), cancelled after a fresh `ssh rmx-vps` login succeeded |
-| 8 | ~19:51 | `ufw allow OpenSSH`, `ufw enable` |
-| 9 | ~19:51 | `fail2ban` installed and enabled (default `sshd` jail) |
-| 10 | ~19:56 | Rebooted → kernel `6.8.0-87` → `6.8.0-147`; everything verified after boot |
-| 11 | ~20:04 | Dashboard terminal exception: root+password from `45.81.252.94` only (see §5). Backup: `/etc/ssh/sshd_config.bak-pre-dashboard`. IP whitelisted in fail2ban |
-| 12 | ~20:06 | `/root/.ssh/authorized_keys` emptied — no key logs in as root any more |
-
----
-
 ## 5. Current SSH configuration
 
 **`/etc/ssh/sshd_config.d/00-hardening.conf`** (new; read first, so it wins):
@@ -131,13 +100,7 @@ Effective result (`sshd -T -C user=root,addr=…`):
 | `45.81.252.94` (dashboard) | yes | yes | yes (but root has no keys) |
 | anywhere else | **no** | **no** | yes (`rmx` only) |
 
-Backups in `/etc/ssh/`:
-
-| File | Contents |
-|---|---|
-| `sshd_config.bak-pubkey-off` | Original file (keys disabled, root+password open) |
-| `sshd_config.bak-pre-hardening` | Keys enabled, before hardening |
-| `sshd_config.bak-pre-dashboard` | Hardened, before the dashboard `Match` block |
+Ansible deletes the hand-built copies `sshd_config.bak-pubkey-off`, `sshd_config.bak-pre-hardening` and `sshd_config.bak-pre-dashboard`. They are not on the server. The files in git are the current configuration.
 
 ---
 
@@ -307,7 +270,7 @@ Tested on 2026-10-15 with a throwaway `nginx` container while ufw allowed only 2
 
 1. **Databases publish no ports.** They sit on the `backend` network, and only the app can reach them.
 2. **Private tools** (admin UIs, dashboards, debug ports) bind to localhost: `"127.0.0.1:PORT:PORT"`. Reach them through an SSH tunnel from the PC: `ssh -L PORT:127.0.0.1:PORT rmx-vps`, then open `http://localhost:PORT`.
-3. **Public ports are deliberate:** listed in the table below, documented in the CHANGELOG, and each gets a matching ufw rule, so `ufw status` stays an honest list of what's open.
+3. **Public ports are deliberate:** listed in the table below, and each gets a matching ufw rule, so `ufw status` stays an honest list of what's open.
 
 Check what is really listening: `sudo ss -tlnp` and `docker ps --format '{{.Names}} {{.Ports}}'`.
 
@@ -422,7 +385,7 @@ The rules in [`config/acl`](https://github.com/rmx-lt/rmx-server-infra/blob/deve
 
 How Mosquitto enforces it: a mower may **subscribe** to another mower's topic (the SUBSCRIBE is accepted), but no message from there is ever delivered to it. A **publish** to another mower's topic is dropped; with MQTT 5 and QoS 1 the client is told `Not authorized`.
 
-Server-only files in `services/mosquitto/data/` (gitignored, no backup):
+Server-only files in `services/mosquitto/data/` (gitignored). The encrypted deploy backup includes this directory, including `store/` and `credentials.txt` ([Server-Infra-Ansible](Server-Infra-Ansible)):
 
 | Path | Owner / mode | Contents |
 |---|---|---|
@@ -594,7 +557,7 @@ Then on the server, replace the key part of the one line in `/home/deploy/.ssh/a
 
 #### Remove
 
-- Stop and delete the containers: `docker compose rm -sf probe-app probe-db`; the data: `sudo rm -rf probe/data` (no backup, by choice).
+- Stop and delete the containers: `docker compose rm -sf probe-app probe-db`; the data: `sudo rm -rf probe/data`. That deletes the live copy. Restore it from the encrypted deploy backup ([Server-Infra-Ansible](Server-Infra-Ansible)).
 - Deploy access: `sudo rm /etc/sudoers.d/deploy /usr/local/sbin/rmx-deploy-probe && sudo userdel -r deploy`; delete the three `DEPLOY_*` secrets on GitHub (and disable the `deploy` job).
 - MQTT: `mosquitto_passwd -D` for `probe-app` and `probe-device` (see above), remove their lines from `credentials.txt` and the probe block from `config/acl`.
 - Caddy: remove the `@probe` handle.
