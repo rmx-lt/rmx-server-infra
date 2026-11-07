@@ -1,6 +1,6 @@
 name: deploy
 
-# Every push to `production` (a merged PR from `development`): encrypted backup,
+# Every push to `production` that changes something outside wiki/ (a merged PR from `development`): encrypted backup,
 # ansible --check --diff, ansible apply, then the server is probed from outside.
 # Secrets (repository settings -> Environments -> production):
 #   CI_SSH_KEY       private key of the `ci` user (public half: vault_ci_ssh_key)
