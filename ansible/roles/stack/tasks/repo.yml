@@ -73,7 +73,7 @@
     - name: Push over SSH with that key, and the commit identity
       ansible.builtin.command: git -C {{ repo_dir }} config --local {{ item.name }} {{ item.value }}
       loop:
-        - { name: remote.origin.url, value: "git@github-rmx-vps:rmx-lt/rmx-vps.git" }
+        - { name: remote.origin.url, value: "git@github-rmx-vps:rmx-lt/rmx-server-infra.git" }
         - { name: user.name, value: jRmx0 }
         - { name: user.email, value: "116594512+jRmx0@users.noreply.github.com" }
       become: true

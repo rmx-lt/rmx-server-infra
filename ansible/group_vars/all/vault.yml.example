@@ -30,14 +30,14 @@ vault_caddy_fw_users:
     password: change-me
     hash: $2a$14$...
 
-# rmx-backend-probe: database password (letters and digits only, it goes
+# rmx-server-app-probe: database password (letters and digits only, it goes
 # into a URL) and the app's own logins.
 vault_probe_db_password: change-me
 vault_probe_app_users:
   probe: change-me
   probe-device: change-me
 
-# Public key of the GitHub Actions deploy key (rmx-backend-probe secret
+# Public key of the GitHub Actions deploy key (rmx-server-app-probe secret
 # DEPLOY_SSH_KEY). It only gets the forced deploy command.
 vault_deploy_ssh_key: ssh-ed25519 AAAA... rmx-backend-probe-deploy
 

@@ -38,7 +38,7 @@
   ansible.builtin.copy:
     dest: /etc/apt/apt.conf.d/52rmx-unattended-upgrades
     content: |
-      // Managed by ansible (rmx-vps). Security updates are on by default in
+      // Managed by ansible (rmx-server-infra). Security updates are on by default in
       // 50unattended-upgrades; this adds cleanup and the reboot.
       Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
       Unattended-Upgrade::Remove-Unused-Dependencies "true";
@@ -84,7 +84,7 @@
   ansible.builtin.copy:
     dest: /etc/sysctl.d/60-rmx.conf
     content: |
-      # Managed by ansible (rmx-vps).
+      # Managed by ansible (rmx-server-infra).
       # Swap only under real memory pressure.
       vm.swappiness={{ swappiness }}
       # Ignore ICMP redirects and source-routed packets (a server routes nothing

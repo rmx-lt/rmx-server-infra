@@ -37,7 +37,7 @@
     path: /root/.ssh/authorized_keys
     state: absent
 
-# --- deploy: GitHub Actions of rmx-backend-probe (wiki Server §10 "Auto-deploy")
+# --- deploy: GitHub Actions of rmx-server-app-probe (wiki Server §10 "Auto-deploy")
 # No password, not in sudo or docker. Its one key may only run the deploy
 # script, with one argument shaped like sha-<7 hex> (checked by sudoers too).
 # The shell is bash only because sshd runs forced commands through it.

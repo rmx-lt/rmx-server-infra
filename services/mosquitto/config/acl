@@ -17,14 +17,14 @@ topic readwrite mower/#
 # so a new mower needs a login only, no change in this file.
 pattern readwrite mower/%u/#
 
-# --- rmx-backend-probe (see wiki Server §10 "Probe") ---------------------------
+# --- rmx-server-app-probe (see wiki Server §10 "Probe") ---------------------------
 # Topics: probe/req/<client-id> (device -> server), probe/res/<client-id>
 # (server -> device), probe/events/records, probe/status/server (retained).
 # The probe server: all of probe/.
 user probe-app
 topic readwrite probe/#
 
-# The ESP32 probe device (rmx-mower-modem-probe, LTE, 8883 only so the client
+# The ESP32 probe device (rmx-mower-gateway-probe, LTE, 8883 only so the client
 # id is always "probe-device"): only its own request/response pair, plus the
 # shared events and server status.
 user probe-device
