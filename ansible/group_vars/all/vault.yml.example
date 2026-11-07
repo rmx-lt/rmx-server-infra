@@ -46,5 +46,5 @@ vault_deploy_ssh_key: ssh-ed25519 AAAA... rmx-backend-probe-deploy
 vault_ci_ssh_key: ""
 
 # Optional: private deploy key with write access to this repo, so the server
-# can push (wiki Server §9). Leave empty and the server clone stays read-only.
+# can push (wiki Server-Infra §9). Leave empty and the server clone stays read-only.
 vault_github_deploy_key: ""

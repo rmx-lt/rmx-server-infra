@@ -1,4 +1,4 @@
-# The probe's server-only files and the deploy script (wiki Server §10 "Probe").
+# The probe's server-only files and the deploy script (wiki Server-Infra §10 "Probe").
 # The containers only start with -e probe=on (probe-on.yml).
 
 - name: Probe data folder

@@ -24,7 +24,7 @@ api.rmx.lt {
 	# rmx-server-app-probe (Compose profile "probe"). The prefix is kept: the app
 	# serves /probe/... itself, including its own login: a session cookie
 	# checked by the app on the API, /probe/ws and /probe/config.json (wiki
-	# page Backend-Probe, "Login and sessions"). Only /probe/health, login/logout and the
+	# page Server-App-Probe, "Login and sessions"). Only /probe/health, login/logout and the
 	# static page (public code, no data) work without a session.
 	# Caddy adds no auth of its own any more (basic auth broke WebSockets on
 	# iPhones). Still closed by default: when the probe is off, probe-app

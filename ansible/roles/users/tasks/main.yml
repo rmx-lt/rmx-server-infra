@@ -37,7 +37,7 @@
     path: /root/.ssh/authorized_keys
     state: absent
 
-# --- deploy: GitHub Actions of rmx-server-app-probe (wiki Server §10 "Auto-deploy")
+# --- deploy: GitHub Actions of rmx-server-app-probe (wiki Server-Infra §10 "Auto-deploy")
 # No password, not in sudo or docker. Its one key may only run the deploy
 # script, with one argument shaped like sha-<7 hex> (checked by sudoers too).
 # The shell is bash only because sshd runs forced commands through it.
@@ -73,7 +73,7 @@
     mode: "0440"
     validate: visudo -cf %s
 
-# --- ci: GitHub Actions of this repo (deploy.yml, wiki Server §11 "CI/CD")
+# --- ci: GitHub Actions of this repo (deploy.yml, wiki Server-Infra §11 "CI/CD")
 # Same pattern as deploy: no password, not in sudo or docker, one key that
 # may only run rmx-ci with backup, check:<sha> or apply:<sha> (sudoers checks
 # the argument too). Created only when the vault has a key for it.

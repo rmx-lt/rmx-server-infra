@@ -35,7 +35,7 @@
     state: absent
   loop: [/root, "/home/{{ admin_user }}"]
 
-# Optional push access from the server (wiki Server §9), with a deploy key that
+# Optional push access from the server (wiki Server-Infra §9), with a deploy key that
 # can write to this repo only.
 - name: Push access from the server
   when: vault_github_deploy_key | length > 0
