@@ -49,7 +49,7 @@
   ansible.builtin.copy:
     dest: /etc/fail2ban/jail.d/rmx.local
     content: |
-      # Managed by ansible (rmx-vps). The sshd jail itself is turned on by
+      # Managed by ansible (rmx-server-infra). The sshd jail itself is turned on by
       # the package's defaults-debian.conf (backend systemd, nftables).
       [DEFAULT]
       # Never ban the provider dashboard's terminal bridge.

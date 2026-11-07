@@ -2,7 +2,7 @@
 # Empty Ubuntu 24.04 VPS -> RMX-SERVER. Run as root, e.g. in the provider
 # dashboard's terminal:
 #
-#   curl -fsSL https://raw.githubusercontent.com/rmx-lt/rmx-vps/production/ansible/bootstrap.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/rmx-lt/rmx-server-infra/production/ansible/bootstrap.sh | bash
 #
 # It installs git + Ansible, clones this repo to /opt/rmx-vps and runs the
 # playbook on this machine. It asks for the vault password (type it; it is
@@ -13,7 +13,7 @@
 #   bash bootstrap.sh -e probe=on        also start the probe
 set -euo pipefail
 
-REPO=https://github.com/rmx-lt/rmx-vps.git
+REPO=https://github.com/rmx-lt/rmx-server-infra.git
 BRANCH=production
 DIR=/opt/rmx-vps
 ADMIN=rmx

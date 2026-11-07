@@ -1,4 +1,4 @@
-# rmx-vps
+# rmx-server-infra
 
 Infrastructure of **RMX-SERVER**, the Blade of Grass VPS (`45.81.252.43`, Ubuntu 24.04): a hardened host running a Docker Compose stack with Caddy (HTTPS for `rmx.lt`, `api.rmx.lt`), Mosquitto (MQTT over TLS on `mqtt.rmx.lt:8883`) and the backend probe.
 
@@ -23,3 +23,7 @@ ssh rmx-vps 'git -C /opt/rmx-vps pull --ff-only'     # after pushing a change fr
 ```
 
 Every change to the server gets a dated entry on the [Server-Changelog](https://github.com/rmx-lt/blade-of-grass/wiki/Server-Changelog) wiki page (what, why, backup, undo).
+
+## License
+
+Code and documentation are licensed under [Apache-2.0](LICENSE).
