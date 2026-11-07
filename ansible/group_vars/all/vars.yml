@@ -36,7 +36,7 @@ public_ports:
 docker_key_fingerprint: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
 
 # --- Services ------------------------------------------------------------
-repo_url: https://github.com/rmx-lt/rmx-vps.git
+repo_url: https://github.com/rmx-lt/rmx-server-infra.git
 repo_dir: /opt/rmx-vps
 # The branch the server follows; GitHub Actions deploys every push to it.
 repo_branch: production

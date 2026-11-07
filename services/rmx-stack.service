@@ -3,7 +3,7 @@
 # Containers have `restart: unless-stopped`, but that is not enough: on
 # 2026-11-02 the nightly auto-reboot (04:30) left Mosquitto stopped. It
 # exited on its own (code 0) during shutdown, so Docker treated it as stopped
-# by hand and didn't bring it back (rmx-vps#37). This unit starts whatever
+# by hand and didn't bring it back (rmx-server-infra#37). This unit starts whatever
 # is not running. --no-recreate: it never changes a running container or
 # applies new config (that's the playbook's job), it only starts and, if a
 # container is missing, creates it.

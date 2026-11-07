@@ -1,4 +1,4 @@
-# rmx-vps
+# rmx-server-infra
 
 Infrastructure of **RMX-SERVER**, the Blade of Grass VPS (`45.81.252.43`, Ubuntu 24.04): a hardened host running a Docker Compose stack with Caddy (HTTPS for `rmx.lt`, `api.rmx.lt`), Mosquitto (MQTT over TLS on `mqtt.rmx.lt:8883`) and the backend probe.
 
