@@ -1,6 +1,8 @@
 # rmx-server-infra — notes for agents
 
-Infrastructure of the Blade of Grass VPS: Ansible playbook, Docker Compose stack (Caddy, Mosquitto, probe) and CI/CD. Current state is documented in the wiki page [Server-Infra](https://github.com/rmx-lt/blade-of-grass/wiki/Server-Infra) (local: `wiki/Server-Infra.md`). Project-wide rules: the meta repo `blade-of-grass` (its CLAUDE.md).
+Project-wide agent rules live in the meta repo's [CLAUDE.md](https://github.com/rmx-lt/blade-of-grass/blob/development/CLAUDE.md); read it first. This file only adds what is specific to this repo.
+
+Infrastructure of the Blade of Grass VPS: Ansible playbook, Docker Compose stack (Caddy, Mosquitto, probe) and CI/CD. Current state is documented in the wiki page [Server-Infra](https://github.com/rmx-lt/blade-of-grass/wiki/Server-Infra) (local: `wiki/Server-Infra.md`).
 
 ## Docs
 
