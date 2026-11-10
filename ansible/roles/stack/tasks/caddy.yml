@@ -1,5 +1,5 @@
 # Caddy's server-only files: OTA images folder and the /fw/ download logins.
-# The users file must exist or Caddy won't start (wiki Server §10 "Firmware images").
+# The users file must exist or Caddy won't start (wiki Server-Infra §10 "Firmware images").
 
 - name: Caddy folders
   ansible.builtin.file:

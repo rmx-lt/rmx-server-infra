@@ -1,4 +1,4 @@
-# Mosquitto's server-only files (wiki Server §10 "Mosquitto"): logins, the
+# Mosquitto's server-only files (wiki Server-Infra §10 "Mosquitto"): logins, the
 # installed ACL, folders for the certificate and persistence. Mosquitto runs
 # as uid 1883 inside the container.
 

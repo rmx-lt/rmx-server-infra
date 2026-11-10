@@ -1,6 +1,6 @@
 #!/bin/bash
-# Deploy one image tag of rmx-server-app-probe. Installed as
-# /usr/local/sbin/rmx-deploy-probe (root:root 0755). See wiki Server §10 "Probe".
+# Deploy one image tag of rmx-server-app. Installed as
+# /usr/local/sbin/rmx-deploy-probe (root:root 0755). See wiki Server-Infra §10 "Probe".
 #
 # Called by GitHub Actions over SSH as the user "deploy". That user's
 # authorized_keys entry forces this command, and sudoers lets it run this
@@ -47,7 +47,7 @@ cd "$SERVICES"
 compose() { docker compose --profile probe "$@"; }
 
 if [[ ! -f $ENV_FILE ]]; then
-	log "REFUSED $TAG: $ENV_FILE is missing (see wiki Server §10 Probe)"
+	log "REFUSED $TAG: $ENV_FILE is missing (see wiki Server-Infra §10 Probe)"
 	exit 1
 fi
 PREV=$(sed -n 's/^PROBE_TAG=\(sha-[0-9a-f]\{7\}\)$/\1/p' "$ENV_FILE")

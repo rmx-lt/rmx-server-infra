@@ -1,5 +1,5 @@
 # Empty Ubuntu 24.04 VPS -> RMX-SERVER. Safe to run again: it only changes
-# what differs. Run it with bootstrap.sh (see the wiki page Server-Ansible).
+# what differs. Run it with bootstrap.sh (see the wiki page Server-Infra-Ansible).
 #
 #   bootstrap.sh                 apply
 #   bootstrap.sh --check --diff  show what would change, change nothing

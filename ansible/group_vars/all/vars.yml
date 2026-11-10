@@ -23,7 +23,7 @@ purge_packages:
 auto_reboot_time: "04:30"
 
 # --- Firewall ------------------------------------------------------------
-# Every public port. Docker publishes its ports past ufw anyway (wiki Server §10),
+# Every public port. Docker publishes its ports past ufw anyway (wiki Server-Infra §10),
 # so this list and the compose files must agree; it keeps `ufw status` honest.
 public_ports:
   - { port: 22, comment: SSH }
@@ -45,7 +45,7 @@ services_dir: "{{ repo_dir }}/services"
 mqtt_domain: mqtt.rmx.lt
 
 # -e probe=on starts the probe and creates its app logins. Off by default
-# (wiki Server §10 "Probe"); a plain run leaves a running probe alone.
+# (wiki Server-Infra §10 "Probe"); a plain run leaves a running probe alone.
 probe: "off"
 # This repo on the machine that runs ansible (files are copied from here).
 repo_src: "{{ playbook_dir | dirname }}"

@@ -4,10 +4,10 @@
 # Each service lives in its own folder with its own compose.yaml,
 # pulled in below. Networks are defined here, once, for all of them.
 #
-# PORT POLICY (Docker bypasses ufw, see wiki Server §10):
+# PORT POLICY (Docker bypasses ufw, see wiki Server-Infra §10):
 #   - databases publish NO ports
 #   - private tools bind to 127.0.0.1 only ("127.0.0.1:PORT:PORT")
-#   - public ports are deliberate, documented on the wiki page Server,
+#   - public ports are deliberate, documented on the wiki page Server-Infra,
 #     and get a matching ufw rule
 
 name: rmx
