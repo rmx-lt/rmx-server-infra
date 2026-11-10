@@ -31,6 +31,38 @@
   changed_when: compose_up.stderr is search('Created|Recreated|Started')
   when: not ansible_check_mode
 
+# `docker compose up -d` does not enable the probe profile, so it never
+# recreates a running probe-app when probe/compose.yaml changes (issue 75).
+# Touch only that container, and only when it is already running. PROBE_TAG
+# stays the line in probe/.env. The 90 s health wait matches rmx-deploy-probe.
+- name: Is probe-app running
+  ansible.builtin.command: docker compose --profile probe ps -q --status running probe-app
+  args: { chdir: "{{ services_dir }}" }
+  register: probe_app_running
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Recreate probe-app when its compose definition changed
+  ansible.builtin.command: docker compose --profile probe up -d --no-deps probe-app
+  args: { chdir: "{{ services_dir }}" }
+  register: probe_app_recreate
+  changed_when: probe_app_recreate.stderr is search('Recreated')
+  when:
+    - not ansible_check_mode
+    - (probe_app_running.stdout | default('')) | length > 0
+
+- name: Wait until the recreated probe-app is healthy
+  ansible.builtin.command: docker compose --profile probe ps --format '{{ '{{' }}.Health{{ '}}' }}' probe-app
+  args: { chdir: "{{ services_dir }}" }
+  register: probe_app_health
+  until: probe_app_health.stdout == 'healthy'
+  retries: 30
+  delay: 3
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - probe_app_recreate is changed
+
 # Docker's restart policy alone left Mosquitto down after a reboot (#37).
 - name: Boot unit that starts the stack
   ansible.builtin.copy:
