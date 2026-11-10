@@ -6,6 +6,10 @@
 #   bootstrap.sh -e probe=on     also start the probe and create its app logins
 - name: RMX-SERVER
   hosts: rmx-vps
+  # A later failure must not drop a reload that an ACL or config change already
+  # queued. Without this, the installed file sits on disk and the running
+  # broker keeps the old rules (issue 70).
+  force_handlers: true
   pre_tasks:
     - name: The vault is there (group_vars/all/vault.yml, see vault.yml.example)
       ansible.builtin.assert:

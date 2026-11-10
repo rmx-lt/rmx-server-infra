@@ -13,6 +13,32 @@
     - { path: firmware/probe, owner: "{{ admin_user }}", mode: "0755" }
     - { path: private, owner: root, mode: "0700" }
 
+# probe-app is uid 65532 and is not in the admin group. The directories
+# above stay 0755 (other can traverse). An scp upload can be owner-only;
+# make the files world-readable. This does not touch caddy/private.
+# stat first so --check on a host that has no firmware dir yet does not fail.
+- name: Firmware directory
+  ansible.builtin.stat:
+    path: "{{ services_dir }}/caddy/firmware"
+  register: caddy_firmware_dir
+
+- name: Firmware images
+  ansible.builtin.find:
+    paths: "{{ services_dir }}/caddy/firmware"
+    file_type: file
+    recurse: true
+    follow: false
+  register: caddy_firmware_files
+  when: caddy_firmware_dir.stat.isdir | default(false)
+
+- name: Firmware images readable by probe-app
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    mode: "0644"
+  loop: "{{ caddy_firmware_files.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+
 - name: /fw/ logins (bcrypt hashes, what Caddy reads)
   ansible.builtin.copy:
     dest: "{{ services_dir }}/caddy/private/fw-users.caddy"
