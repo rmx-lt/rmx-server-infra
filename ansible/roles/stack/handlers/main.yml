@@ -1,4 +1,5 @@
-# Both only act when the container is running; compose up starts it otherwise.
+# Caddy restarts only when its container is already up; compose up starts it
+# otherwise. Mosquitto's reload is below.
 - name: Restart caddy
   ansible.builtin.shell: |
     if [ -n "$(docker compose ps -q --status running caddy)" ]; then
@@ -7,10 +8,33 @@
   args: { chdir: "{{ services_dir }}" }
   changed_when: true
 
-# SIGHUP reloads logins, ACL and certificate without dropping clients.
+# SIGHUP reloads logins, ACL, mosquitto.conf and the certificate without
+# dropping clients. chdir is required: the play runs from ansible/, and
+# without it `docker compose` finds no project, the old `ps` test was empty,
+# and changed_when still reported success (issue 70). Always try the signal.
 - name: Reload mosquitto
   ansible.builtin.shell: |
-    if [ -n "$(docker compose ps -q --status running mosquitto)" ]; then
-      docker compose kill -s HUP mosquitto
+    set -o pipefail
+    if docker compose kill -s HUP mosquitto; then
+      for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+        if docker compose logs --since 30s mosquitto 2>&1 | grep -q 'Reloading config.'; then
+          echo reloaded
+          exit 0
+        fi
+        sleep 0.4
+      done
+      echo "SIGHUP did not reload mosquitto (no 'Reloading config.' in the log)" >&2
+      exit 1
     fi
-  changed_when: true
+    # Stopped or not created yet: the next start reads the files. A broker
+    # that is actually running must accept the signal.
+    if [ -n "$(docker compose ps -q --status running mosquitto)" ]; then
+      echo "mosquitto is running but did not accept SIGHUP" >&2
+      exit 1
+    fi
+    echo "mosquitto is not running; the installed files apply when it starts"
+  args:
+    chdir: "{{ services_dir }}"
+    executable: /bin/bash
+  register: mosquitto_reload
+  changed_when: (mosquitto_reload.stdout | default('')) is search('reloaded')

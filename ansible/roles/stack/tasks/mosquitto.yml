@@ -26,6 +26,25 @@
     mode: "0600"
   notify: Reload mosquitto
 
+# The broker reads this file from the config directory mount. A checksum stamp
+# (server only, not the file Mosquitto reads) is what tells the play the
+# content changed, so the reload handler runs. The stamp stays out of the
+# mounted auth/certs/store directories.
+- name: Hash of mosquitto.conf
+  ansible.builtin.stat:
+    path: "{{ services_dir }}/mosquitto/config/mosquitto.conf"
+    checksum_algorithm: sha1
+  register: mosquitto_conf
+
+- name: Mosquitto config reload stamp
+  ansible.builtin.copy:
+    dest: "{{ services_dir }}/mosquitto/data/.mosquitto.conf.sha1"
+    content: "{{ mosquitto_conf.stat.checksum }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload mosquitto
+
 # mosquitto_passwd salts every hash, so it can't be re-run on each play
 # without "changing" everything. A login is added when it is missing; to
 # change a password, edit the vault and run with -e reset_mqtt_passwords=true

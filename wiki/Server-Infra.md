@@ -411,8 +411,9 @@ The mower then connects to `mqtt.rmx.lt:8883` with TLS, username `mower-02` and 
 
 - New password for a login: the same commands (it replaces the old one); delete the old line in `credentials.txt`.
 - Remove a login: `docker compose exec -u mosquitto mosquitto mosquitto_passwd -D /mosquitto/auth/passwd mower-02`, then the HUP, then delete its line in `credentials.txt`. A client that is already connected stays connected until it reconnects (or `docker compose restart mosquitto`).
-- Changed `config/acl` (after `git pull`): `sudo install -o 1883 -g 1883 -m 0600 mosquitto/config/acl mosquitto/data/auth/acl && docker compose kill -s HUP mosquitto`. Mosquitto reads a copy because it warns about ACL files that are world-readable or not owned by its user, and future versions will refuse them.
-- Changed `config/mosquitto.conf`: `docker compose restart mosquitto` (after `git pull` the file bind mount keeps the old inode, like the Caddyfile).
+- A changed `config/acl` or `config/mosquitto.conf`, and a new or reset login, makes the playbook send `docker compose kill -s HUP mosquitto` after the container is up. The ACL task installs `config/acl` to `data/auth/acl` (owner 1883, mode `0600`) and notifies that reload. `mosquitto.conf` is watched by a checksum stamp at `data/.mosquitto.conf.sha1`. SIGHUP reloads logins, the ACL, `mosquitto.conf` and the certificate, and it does not disconnect clients. The play fails if the broker is running but its log has no `Reloading config.` line. The reload still runs when a later task fails. A stopped broker reads the files the next time it starts.
+- By hand, after `git pull`: `sudo install -o 1883 -g 1883 -m 0600 mosquitto/config/acl mosquitto/data/auth/acl && docker compose kill -s HUP mosquitto`. Mosquitto reads a copy of the ACL because it warns about ACL files that are world-readable or not owned by its user, and future versions will refuse them.
+- `services/mosquitto/config/` is mounted as a directory (`./config:/mosquitto/config:ro`), so a replaced `mosquitto.conf` is the file the process opens on SIGHUP. The Caddyfile is still a single-file mount and needs `docker compose restart caddy`.
 
 **How the certificate gets to Mosquitto (and survives renewals)**
 

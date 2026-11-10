@@ -11,8 +11,12 @@ services:
     ports:
       - "8883:8883"
     volumes:
-      # Config from this repo (no secrets in it)
-      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      # The whole config directory, not the conf file alone. A file bind mount
+      # keeps the inode from container start, so a later git checkout of
+      # mosquitto.conf stays invisible and SIGHUP re-reads the old file.
+      # config/acl is in this directory too; Mosquitto does not use it (it
+      # reads the installed copy under data/auth).
+      - ./config:/mosquitto/config:ro
       # Server only (gitignored):
       #   data/auth/passwd  - logins (hashed), owner 1883, mode 0600
       #   data/auth/acl     - installed copy of config/acl, owner 1883, mode 0600
