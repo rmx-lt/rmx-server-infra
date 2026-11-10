@@ -30,6 +30,7 @@ public_ports:
   - { port: 80, comment: "HTTP (Caddy, ACME)" }
   - { port: 443, comment: "HTTPS (Caddy)" }
   - { port: 8883, comment: "MQTT over TLS (Mosquitto)" }
+  - { port: 8884, comment: "MQTT over TLS, device certificates (Mosquitto)" }
 
 # --- Docker --------------------------------------------------------------
 # Docker's apt signing key, as published in Docker's install docs.

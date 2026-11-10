@@ -1,5 +1,6 @@
 # Mosquitto: MQTT broker for the mowers.
-# Public port 8883 (MQTT over TLS). Port 1883 (plain MQTT) is NOT published:
+# Public ports 8883 (MQTT over TLS, password logins) and 8884 (MQTT over TLS,
+# device client certificates). Port 1883 (plain MQTT) is NOT published:
 # it is only reachable from containers on the rmx_edge network (the app).
 
 services:
@@ -10,6 +11,10 @@ services:
     mem_limit: 64m
     ports:
       - "8883:8883"
+      # Published even before the device CA exists: nothing listens behind it
+      # until Ansible writes config/device-listener/8884.conf. A changed port
+      # list recreates the container (docker compose up -d), HUP does not.
+      - "8884:8884"
     volumes:
       # The whole config directory, not the conf file alone. A file bind mount
       # keeps the inode from container start, so a later git checkout of
