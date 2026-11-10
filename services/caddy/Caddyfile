@@ -5,7 +5,7 @@
 		protocols h1 h2
 	}
 	# Let's Encrypt only, no ZeroSSL fallback: the mower probe trusts only ISRG
-	# Root X1/X2 (rmx-mower-gateway-probe certs/rmx-ca-bundle.pem). A certificate
+	# Root X1/X2 (rmx-mower-gateway certs/rmx-ca-bundle.pem). A certificate
 	# from another CA would cut it off, including from OTA fixes.
 	cert_issuer acme {
 		dir https://acme-v02.api.letsencrypt.org/directory
@@ -21,10 +21,10 @@ rmx.lt {
 
 # API: placeholder until the app container exists
 api.rmx.lt {
-	# rmx-server-app-probe (Compose profile "probe"). The prefix is kept: the app
+	# rmx-server-app (Compose profile "probe"). The prefix is kept: the app
 	# serves /probe/... itself, including its own login: a session cookie
 	# checked by the app on the API, /probe/ws and /probe/config.json (wiki
-	# page Server-App-Probe, "Login and sessions"). Only /probe/health, login/logout and the
+	# page Server-App, "Login and sessions"). Only /probe/health, login/logout and the
 	# static page (public code, no data) work without a session.
 	# Caddy adds no auth of its own any more (basic auth broke WebSockets on
 	# iPhones). Still closed by default: when the probe is off, probe-app
@@ -38,7 +38,7 @@ api.rmx.lt {
 	}
 
 	# Firmware images for OTA updates of the LTE modem board
-	# (rmx-mower-gateway-probe): GET /fw/probe/<version>.bin, read-only from
+	# (rmx-mower-gateway): GET /fw/probe/<version>.bin, read-only from
 	# caddy/firmware/ on the host. HTTP basic auth, one login per device; the
 	# logins (bcrypt hashes) are server only in caddy/private/fw-users.caddy
 	# (template: fw-users.caddy.example). That file must exist or Caddy won't
