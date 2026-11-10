@@ -1,0 +1,2 @@
+# Public device CA files belong here: root.pem and crl.pem.
+# Do not commit private keys. Ansible enables listener 8884 only when both files exist.

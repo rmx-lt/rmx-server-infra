@@ -38,3 +38,20 @@
     executable: /bin/bash
   register: mosquitto_reload
   changed_when: (mosquitto_reload.stdout | default('')) is search('reloaded')
+
+# Adding or removing listener 8884. SIGHUP reloads ACL, logins and the CRL,
+# but it does not bind a new port. Restart only when the listener file
+# appears or disappears. A stopped broker reads the files on the next start.
+- name: Restart mosquitto
+  ansible.builtin.shell: |
+    if [ -n "$(docker compose ps -q --status running mosquitto)" ]; then
+      docker compose restart mosquitto
+      echo restarted
+    else
+      echo "mosquitto is not running; the listener applies when it starts"
+    fi
+  args:
+    chdir: "{{ services_dir }}"
+    executable: /bin/bash
+  register: mosquitto_restart
+  changed_when: (mosquitto_restart.stdout | default('')) is search('restarted')
