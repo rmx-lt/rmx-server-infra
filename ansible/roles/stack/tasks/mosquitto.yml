@@ -70,8 +70,10 @@
 - name: Device certificate listener
   ansible.builtin.copy:
     dest: "{{ services_dir }}/mosquitto/config/device-listener/8884.conf"
-    owner: root
-    group: root
+    # Same owner as the rest of the repo checkout: the "Repo files owned by
+    # the admin user" task chowns everything else, and root here made run 2 differ.
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
     mode: "0644"
     content: |
       # Written by Ansible when device-ca/root.pem and crl.pem both exist.
