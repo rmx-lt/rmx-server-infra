@@ -295,7 +295,7 @@ services/
 │   ├── cert-sync/        # host script + systemd timer: Caddy's cert -> Mosquitto
 │   ├── tests/mqtt-tests.ps1  # test suite, run from the Windows PC
 │   └── data/             # (server only, gitignored) logins, cert copy, persistence
-└── probe/                # rmx-server-app-probe, Compose profile "probe" (off unless started)
+└── probe/                # rmx-server-app, Compose profile "probe" (off unless started)
     ├── compose.yaml      # probe-db (TimescaleDB) + probe-app (GHCR image)
     ├── .env.example      # template for .env (server only: passwords + PROBE_TAG, the deployed image)
     ├── deploy/           # deploy script, sudoers rule, authorized_keys template
@@ -328,7 +328,7 @@ Not public (reachable only by containers on `rmx_edge`): Mosquitto's plain MQTT 
 - Image `caddy:2.11` (2.11.7 when installed); container `rmx-caddy-1`.
 - Sites:
   - `https://rmx.lt`: static placeholder page from `site/`
-  - `https://api.rmx.lt`: placeholder JSON `{"service":"rmx-api","status":"placeholder"}`, except `/probe` and `/probe/*` → probe-app:8080 (prefix kept). The app does its own login (see [Probe](#probe-rmx-server-app-probe)); Caddy adds no auth. When the probe is off, `/probe/*` answers 502
+  - `https://api.rmx.lt`: placeholder JSON `{"service":"rmx-api","status":"placeholder"}`, except `/probe` and `/probe/*` → probe-app:8080 (prefix kept). The app does its own login (see [Probe](#probe-rmx-server-app)); Caddy adds no auth. When the probe is off, `/probe/*` answers 502
   - `https://api.rmx.lt/fw/*`: OTA firmware images, static files with HTTP basic auth (see [Firmware images](#firmware-images-ota))
   - `https://www.rmx.lt/…` → **301** to `https://rmx.lt/…`
   - `https://mqtt.rmx.lt`: a one-line text. The block exists so that Caddy obtains and renews the certificate Mosquitto uses (see [Mosquitto](#mosquitto-mqtt)). No MQTT goes through Caddy
@@ -338,12 +338,12 @@ Not public (reachable only by containers on `rmx_edge`): Mosquitto's plain MQTT 
 
 ### Firmware images (OTA)
 
-The LTE modem board ([rmx-mower-gateway-probe](https://github.com/rmx-lt/rmx-mower-gateway-probe), wiki [Mower-Gateway-Probe → Firmware updates](Mower-Gateway-Probe#firmware-updates-ota)) downloads new firmware from `https://api.rmx.lt/fw/probe/<version>.bin`.
+The LTE modem board ([rmx-mower-gateway](https://github.com/rmx-lt/rmx-mower-gateway), wiki [Mower-Gateway → Firmware updates](Mower-Gateway#firmware-updates-ota)) downloads new firmware from `https://api.rmx.lt/fw/probe/<version>.bin`.
 
 - Files: `services/caddy/firmware/` on the host → `/srv/fw` in Caddy, read-only. `firmware/probe/<version>.bin` is served as `/fw/probe/<version>.bin`. Range requests work (the device resumes dropped downloads); directories give 404, not a listing.
 - Login: HTTP basic auth, one login per device, in `services/caddy/private/fw-users.caddy` (server only, gitignored; template [`fw-users.caddy.example`](https://github.com/rmx-lt/rmx-server-infra/blob/development/services/caddy/fw-users.caddy.example)). Plain-text copies go in `caddy/private/credentials.txt` (root, `0600`). **The file must exist or Caddy won't start**; an empty file locks `/fw/` (401 for everyone). Tested with Caddy 2.11.2 (2026-10-22, locally): no login 401, wrong password 401, right one 200, `Range` 206, directory 404, missing users file = config error, empty file = 401.
 - Trust: the images are signed with a key that exists only on the PC, and the device refuses an image with any other signature. The login only keeps casual downloads away, so a hacked server can't push its own firmware.
-- Upload: `tools\release.ps1` in rmx-mower-gateway-probe (scp as rmx into `firmware/probe/`).
+- Upload: `tools\release.ps1` in rmx-mower-gateway (scp as rmx into `firmware/probe/`).
 
 One-time setup (on the server; create the users file **before** restarting Caddy):
 
@@ -378,8 +378,8 @@ Then copy the password into the device's `sdkconfig` (`CONFIG_PROBE_OTA_PASSWORD
 |---|---|---|
 | `app` | `mower/#` (read + write) | The backend app (Phase 5) |
 | `mower-01` | `mower/mower-01/#` only | First mower |
-| `probe-app` | `probe/#` (read + write) | rmx-server-app-probe server |
-| `probe-device` | write `probe/req/probe-device`; read `probe/res/probe-device`, `probe/events/#`, `probe/status/#` | The ESP32 LTE probe device ([rmx-mower-gateway-probe](https://github.com/rmx-lt/rmx-mower-gateway-probe)), password in its gitignored `sdkconfig` |
+| `probe-app` | `probe/#` (read + write) | rmx-server-app server |
+| `probe-device` | write `probe/req/probe-device`; read `probe/res/probe-device`, `probe/events/#`, `probe/status/#` | The ESP32 LTE probe device ([rmx-mower-gateway](https://github.com/rmx-lt/rmx-mower-gateway)), password in its gitignored `sdkconfig` |
 
 The rules in [`config/acl`](https://github.com/rmx-lt/rmx-server-infra/blob/development/services/mosquitto/config/acl): `probe-app` and `probe-device` have explicit `user` entries; every login also gets `mower/<its username>/#` (`pattern readwrite mower/%u/#`). A new mower needs a login only, no ACL change. Planned topics: `mower/<id>/telemetry`, `mower/<id>/status` (retained, also the last-will), `mower/<id>/cmd`, `mower/<id>/cmd/ack`.
 
@@ -465,16 +465,16 @@ Deploy a change made on the PC: commit + push, then `ssh rmx-vps 'git -C /opt/rm
 
 Check the certificates from the PC: `curl.exe -vI https://rmx.lt` (Windows curl verifies the chain and fails loudly if it's bad).
 
-### Probe (rmx-server-app-probe)
+### Probe (rmx-server-app)
 
-[rmx-server-app-probe](https://github.com/rmx-lt/rmx-server-app-probe) is a learning/diagnostic app and a full rehearsal of the production workflow: a Go server plus a React page with a live table, CRUD over HTTPS REST, WSS and MQTT over WSS, logged to TimescaleDB. Its [Deployment](Server-App-Probe#deployment) section is the contract this setup follows. The deploy setup below will be copied for the production app.
+[rmx-server-app](https://github.com/rmx-lt/rmx-server-app) is a learning/diagnostic app and a full rehearsal of the production workflow: a Go server plus a React page with a live table, CRUD over HTTPS REST, WSS and MQTT over WSS, logged to TimescaleDB. Its [Deployment](Server-App#deployment) section is the contract this setup follows. The deploy setup below will be copied for the production app.
 
 **Containers** ([`services/probe/compose.yaml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/services/probe/compose.yaml)), Compose profile `probe`, so a plain `docker compose up -d` leaves them alone:
 
 | Container | Image | Networks | Memory | Notes |
 |---|---|---|---|---|
 | `probe-db` | `timescale/timescaledb:2.30.2-pg17` | `rmx_backend` | `mem_limit 256m` (~60 MB used) | No ports. Tuned small: `shared_buffers=32MB`, `work_mem=2MB`, `max_connections=20`, no parallel workers, `timescaledb.max_background_workers=3`, `timescaledb.telemetry_level=off`. Data in `probe/data/db/` |
-| `probe-app` | `ghcr.io/rmx-lt/rmx-backend-probe:${PROBE_TAG}` | `rmx_edge` + `rmx_backend` | `mem_limit 64m` (~8 MB used) | No ports; Caddy proxies to `probe-app:8080`. Health check every 5 s (`/probe/health`). A static Go binary (26 MB) on `distroless/static`, `GOMEMLIMIT=40MiB` inside the 64 MB limit. Log level from `LOG_LEVEL` (`RUST_LOG` in the compose file is a leftover and ignored). Its MQTT client speaks MQTT 5; migrations run with goose, which adopts an existing database on first start (the old `_sqlx_migrations` table stays unused). The image keeps the name `rmx-backend-probe` although the repo is `rmx-server-app-probe` |
+| `probe-app` | `ghcr.io/rmx-lt/rmx-backend-probe:${PROBE_TAG}` | `rmx_edge` + `rmx_backend` | `mem_limit 64m` (~8 MB used) | No ports; Caddy proxies to `probe-app:8080`. Health check every 5 s (`/probe/health`). A static Go binary (26 MB) on `distroless/static`, `GOMEMLIMIT=40MiB` inside the 64 MB limit. Log level from `LOG_LEVEL` (`RUST_LOG` in the compose file is a leftover and ignored). Its MQTT client speaks MQTT 5; migrations run with goose, which adopts an existing database on first start (the old `_sqlx_migrations` table stays unused). The image keeps the name `rmx-backend-probe` although the repo is `rmx-server-app` |
 
 The whole probe uses about 50–70 MB of RAM while running (measured 2026-10-18: ~50 MB more "available" after stopping it).
 
@@ -498,7 +498,7 @@ The app login itself lives in the probe database (`users` table, Argon2id hash);
 | `https://api.rmx.lt/probe/health` | probe-app health JSON (200 / 503) | None (only up/down and the version) |
 | `mqtts://mqtt.rmx.lt:8883` | Mosquitto (devices only, e.g. `probe-device`) | MQTT login per device |
 
-**Login** (since 2026-10-19; before that, Caddy basic auth): the app has its own login page and server-side sessions. After login the browser holds an `HttpOnly`, `Secure`, `SameSite=Strict` cookie (`__Secure-probe_session`, `Path=/probe`); the app checks it on every API request and on the WebSocket handshake, which also fixed WSS on iPhones (WebKit sends cookies on WebSocket handshakes, but not basic-auth credentials). Requests that change something and WebSocket handshakes must come from `https://api.rmx.lt` (`ALLOWED_ORIGINS` in `probe/compose.yaml`), and failed logins slow down (per username and IP). Why each choice: [Server-App-Probe → Login and sessions](Server-App-Probe#login-and-sessions).
+**Login** (since 2026-10-19; before that, Caddy basic auth): the app has its own login page and server-side sessions. After login the browser holds an `HttpOnly`, `Secure`, `SameSite=Strict` cookie (`__Secure-probe_session`, `Path=/probe`); the app checks it on every API request and on the WebSocket handshake, which also fixed WSS on iPhones (WebKit sends cookies on WebSocket handshakes, but not basic-auth credentials). Requests that change something and WebSocket handshakes must come from `https://api.rmx.lt` (`ALLOWED_ORIGINS` in `probe/compose.yaml`), and failed logins slow down (per username and IP). Why each choice: [Server-App → Login and sessions](Server-App#login-and-sessions).
 
 **Users** (no sign-up page; run on the server, in `/opt/rmx-vps/services`, with the probe on). The password is piped in from stdin, so it never appears on a command line:
 
@@ -529,7 +529,7 @@ docker compose logs -f probe-app               # logs
 
 #### Auto-deploy (CD)
 
-Every push to `production` in rmx-server-app-probe deploys (pushes to `development` only build and test). After the image is pushed to GHCR, the `deploy` job sends **only the tag** over SSH:
+Every push to `production` in rmx-server-app deploys (pushes to `development` only build and test). After the image is pushed to GHCR, the `deploy` job sends **only the tag** over SSH:
 
 ```
 GitHub Actions --ssh deploy@45.81.252.43 "sha-1234abc"--> forced command
@@ -542,13 +542,13 @@ GitHub Actions --ssh deploy@45.81.252.43 "sha-1234abc"--> forced command
 - **`/usr/local/sbin/rmx-deploy-probe`** ([source](https://github.com/rmx-lt/rmx-server-infra/blob/development/services/probe/deploy/rmx-deploy-probe.sh)): checks the tag again, takes a lock (one deploy at a time), pulls the image (a failed pull changes nothing), rewrites the `PROBE_TAG` line in `probe/.env` (atomically, keeping owner and mode), recreates `probe-app` and waits up to 90 s for `healthy`. If it isn't healthy, it writes the previous tag back, recreates again and exits 1, so the GitHub job fails. Old probe images are pruned after a good deploy. If the probe is **off**, it only records and pulls the tag; a deploy never turns the probe on. Tested: good deploy, unknown tag, and a rollback (DB stopped on purpose).
 - **Log**: `/var/log/rmx-deploy-probe.log` (root:adm) and the journal: `sudo journalctl -t rmx-deploy-probe`.
 - **Deploy by hand** (as rmx): `sudo rmx-deploy-probe sha-1234abc`. Roll back the same way, with an older tag.
-- **GitHub side** (rmx-server-app-probe → Settings → Secrets and variables → Actions): `DEPLOY_HOST` (`45.81.252.43`), `DEPLOY_SSH_KEY` (private key, exists only there), `DEPLOY_KNOWN_HOSTS` (this server's ed25519 host-key line, pinned: fingerprint in the table at the top). The job retries up to 3 times on SSH connection errors only (exit 255): new SSH connections to this VPS are sometimes dropped before they reach sshd.
+- **GitHub side** (rmx-server-app → Settings → Secrets and variables → Actions): `DEPLOY_HOST` (`45.81.252.43`), `DEPLOY_SSH_KEY` (private key, exists only there), `DEPLOY_KNOWN_HOSTS` (this server's ed25519 host-key line, pinned: fingerprint in the table at the top). The job retries up to 3 times on SSH connection errors only (exit 255): new SSH connections to this VPS are sometimes dropped before they reach sshd.
 
 **Rotate the deploy key** (from the Windows PC, in Git Bash, because PowerShell can't pass an empty passphrase to ssh-keygen):
 
 ```bash
 ssh-keygen -t ed25519 -N "" -C rmx-backend-probe-deploy -f ./deploy_key
-gh secret set DEPLOY_SSH_KEY -R rmx-lt/rmx-server-app-probe < ./deploy_key
+gh secret set DEPLOY_SSH_KEY -R rmx-lt/rmx-server-app < ./deploy_key
 ```
 
 Then on the server, replace the key part of the one line in `/home/deploy/.ssh/authorized_keys` (keep the `restrict,command=…` prefix) with the content of `deploy_key.pub`, and delete both local files. The old key stops working as soon as the line is replaced.

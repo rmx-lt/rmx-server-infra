@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy one image tag of rmx-server-app-probe. Installed as
+# Deploy one image tag of rmx-server-app. Installed as
 # /usr/local/sbin/rmx-deploy-probe (root:root 0755). See wiki Server-Infra §10 "Probe".
 #
 # Called by GitHub Actions over SSH as the user "deploy". That user's
