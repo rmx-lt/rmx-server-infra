@@ -377,11 +377,11 @@ Then copy the password into the device's `sdkconfig` (`CONFIG_PROBE_OTA_PASSWORD
 | Login | Can use | Purpose |
 |---|---|---|
 | `app` | `mower/#` (read + write) | The backend app (Phase 5) |
-| `mower-01` | `mower/mower-01/#` only | First mower |
-| `probe-app` | `probe/#` (read + write) | rmx-server-app server |
-| `probe-device` | write `probe/req/probe-device`; read `probe/res/probe-device`, `probe/events/#`, `probe/status/#` | The ESP32 LTE probe device ([rmx-mower-gateway](https://github.com/rmx-lt/rmx-mower-gateway)), password in its gitignored `sdkconfig` |
+| `mower-01` | `mower/mower-01/#`, read `mower/events/#` and `mower/status/server` | First mower: the ESP32 LTE gateway ([rmx-mower-gateway](https://github.com/rmx-lt/rmx-mower-gateway)) since its move to `mower/` topics (2026-11, issue 53; password in NVS) |
+| `probe-app` | `mower/#` and (legacy, until the gateway runs as `mower-01`) `probe/#`, read + write | rmx-server-app server |
+| `probe-device` | legacy, removed after the switch: write `probe/req/probe-device`; read `probe/res/probe-device`, `probe/events/#`, `probe/status/#` | The ESP32 LTE probe device ([rmx-mower-gateway](https://github.com/rmx-lt/rmx-mower-gateway)), password in its gitignored `sdkconfig` |
 
-The rules in [`config/acl`](https://github.com/rmx-lt/rmx-server-infra/blob/development/services/mosquitto/config/acl): `probe-app` and `probe-device` have explicit `user` entries; every login also gets `mower/<its username>/#` (`pattern readwrite mower/%u/#`). A new mower needs a login only, no ACL change. Planned topics: `mower/<id>/telemetry`, `mower/<id>/status` (retained, also the last-will), `mower/<id>/cmd`, `mower/<id>/cmd/ack`.
+The rules in [`config/acl`](https://github.com/rmx-lt/rmx-server-infra/blob/development/services/mosquitto/config/acl): `probe-app` and `probe-device` have explicit `user` entries; every login also gets `mower/<its username>/#` (`pattern readwrite mower/%u/#`) and may read the shared server topics `mower/events/#` (change events) and `mower/status/server` (retained online/offline); `events` and `status` are therefore not usable as mower names. The gateway link topics are `mower/<id>/req` and `mower/<id>/res` (see wiki Mower-Gateway-Server-Contract). A new mower needs a login only, no ACL change. Planned topics: `mower/<id>/telemetry`, `mower/<id>/status` (retained, also the last-will), `mower/<id>/cmd`, `mower/<id>/cmd/ack`.
 
 How Mosquitto enforces it: a mower may **subscribe** to another mower's topic (the SUBSCRIBE is accepted), but no message from there is ever delivered to it. A **publish** to another mower's topic is dropped; with MQTT 5 and QoS 1 the client is told `Not authorized`.
 
