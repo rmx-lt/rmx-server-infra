@@ -5,6 +5,11 @@
 id_*
 !id_*.pub
 *.pem
+# Public device CA files (wiki Device-CA): the root certificate and the CRL.
+!services/mosquitto/config/device-ca/root.pem
+!services/mosquitto/config/device-ca/crl.pem
+# Written by Ansible on the server only (listener 8884)
+services/mosquitto/config/device-listener/8884.conf
 *.key
 *.ppk
 *.p12

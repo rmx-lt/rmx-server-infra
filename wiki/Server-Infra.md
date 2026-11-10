@@ -10,7 +10,7 @@
 | Admin PC | Windows 11, PowerShell, OpenSSH client |
 | Setup date | 2026-10-14 (times in UTC) |
 | Domain | `rmx.lt` (`@` A → this IP; `api`, `mqtt`, `www` CNAME → `rmx.lt.`) |
-| Public ports | 22 (SSH), 80 + 443 (Caddy), 8883 (MQTT over TLS, Mosquitto). See [§10](#10-docker--services) |
+| Public ports | 22 (SSH), 80 + 443 (Caddy), 8883 (MQTT over TLS, password logins), 8884 (MQTT over TLS, device certificates). See [§10](#10-docker--services) |
 
 **This page** describes the current state; history lives in git and the PRs of [rmx-server-infra](https://github.com/rmx-lt/rmx-server-infra). The [rmx-server-infra repo](https://github.com/rmx-lt/rmx-server-infra) holds the config and code. [`config/`](https://github.com/rmx-lt/rmx-server-infra/tree/development/config) holds copies of the server's config files, pulled with the commands in [§9](#9-updating-this-repo). [`services/`](https://github.com/rmx-lt/rmx-server-infra/tree/development/services) holds the Docker Compose stack, run from the server clone (see [§10](#10-docker--services)).
 
@@ -118,7 +118,8 @@ Default: deny (incoming), allow (outgoing), disabled (routed)
 80/tcp                  ALLOW IN    Anywhere        # HTTP (Caddy, ACME)
 443/tcp                 ALLOW IN    Anywhere        # HTTPS (Caddy)
 8883/tcp                ALLOW IN    Anywhere        # MQTT over TLS (Mosquitto)
-(+ the same three for v6)
+8884/tcp                ALLOW IN    Anywhere        # MQTT over TLS, device certificates (Mosquitto)
+(+ the same four for v6)
 ```
 
 Opening another port: `sudo ufw allow PORT/tcp comment "what it is"`.
@@ -319,7 +320,8 @@ services/
 | 22/tcp | sshd (host) | ✅ | SSH |
 | 80/tcp | Caddy | ✅ | Let's Encrypt HTTP-01 challenge, redirect to HTTPS |
 | 443/tcp | Caddy | ✅ | HTTPS (HTTP/1.1 + HTTP/2). HTTP/3 is turned off, so 443/udp stays closed |
-| 8883/tcp | Mosquitto | ✅ | MQTT over TLS (`mqtt.rmx.lt`), login required |
+| 8883/tcp | Mosquitto | ✅ | MQTT over TLS (`mqtt.rmx.lt`), password login |
+| 8884/tcp | Mosquitto | ✅ | MQTT over TLS (`mqtt.rmx.lt`), device client certificate |
 
 Not public (reachable only by containers on `rmx_edge`): Mosquitto's plain MQTT **1883** (`mosquitto:1883`, the app); probe-app's **8080** (only via Caddy at `https://api.rmx.lt/probe/`). probe-db's 5432 is on `rmx_backend` only.
 
@@ -365,11 +367,16 @@ Then copy the password into the device's `sdkconfig` (`CONFIG_PROBE_OTA_PASSWORD
 
 - Image `eclipse-mosquitto:2.1-alpine` (2.1.2 when installed; there is no plain `2.1` tag); container `rmx-mosquitto-1`; `mem_limit: 64m` (it uses ~3.5 MB).
 - Listeners ([`config/mosquitto.conf`](https://github.com/rmx-lt/rmx-server-infra/blob/development/services/mosquitto/config/mosquitto.conf)):
-  - **8883**: MQTT over TLS, TLS 1.2 minimum (1.3 preferred), certificate for `mqtt.rmx.lt`. Published.
+  - **8883**: MQTT over TLS, TLS 1.2 minimum (1.3 preferred), certificate for `mqtt.rmx.lt`. Password logins. Published.
+  - **8884**: MQTT over TLS for a device client certificate. Same server certificate as 8883. `require_certificate true`, `cafile` is `config/device-ca/root.pem`, `crlfile` is `config/device-ca/crl.pem`, `use_identity_as_username true` (the certificate CN is the MQTT username, so `pattern readwrite mower/%u/#` is `mower/<cn>/#`). Published. A password-only login is refused on 8884 (no certificate, TLS handshake fails). Password logins stay on 8883, which ignores client certificates.
   - **1883**: plain MQTT for containers on `rmx_edge` (the app). Not published.
-  - All: `allow_anonymous false`, logins from `data/auth/passwd`, rules from `data/auth/acl`.
+  - All: `allow_anonymous false`, logins from `data/auth/passwd` (not used on 8884), rules from `data/auth/acl`.
+- Ansible writes `config/device-listener/8884.conf` only when both `config/device-ca/root.pem` and `config/device-ca/crl.pem` are in the checkout (`mosquitto.conf` ends with `include_dir /mosquitto/config/device-listener`). Those two files are public ([Device-CA](https://github.com/rmx-lt/blade-of-grass/blob/development/wiki/Device-CA.md) in the meta repo). There is no placeholder certificate. Until both files are committed the directory has no listener file and Mosquitto runs on 8883 and 1883 only, so a deploy before the CA exists is safe. `8884.conf` is generated on the server and gitignored.
+- Settings are global (no `per_listener_settings`): the same `allow_anonymous false`, `password_file` and `acl_file` apply to 8883 and 8884. On 8884 `use_identity_as_username` makes the certificate CN the username, so a CN is checked against the ACL like a login name and no password is used (tested: a valid certificate plus a password still acts as the CN). **A CN of `app` or `probe-app` would get that login's ACL: never sign those names or `events`/`status`.**
+- Applying changes: adding or removing `8884.conf` makes the play run `Restart mosquitto` (one short disconnect; a reload does not bind a new port). The port mapping `8884:8884` in `services/mosquitto/compose.yaml` is applied by `docker compose up -d`, which recreates the container once, the first time this version is deployed (clients reconnect). Replacing `crl.pem` or `root.pem` later is a SIGHUP (`Reload mosquitto`, no disconnects): tested, a newly revoked certificate is refused after the reload. The device sends its certificate plus the issuing certificate (`<name>.chain.pem`); the server stores no device private key.
+- **Current state:** the real device CA was created on 2026-11-10 and its public `root.pem` and `crl.pem` are committed, so the deploy enables 8884. The CRL `nextUpdate` is 2036-11-07; regenerate and redeploy it on every revoke. If either file is removed, the listener is not written and Mosquitto runs on 8883 and 1883 only. **Steps for a new CRL** ([Device-CA](https://github.com/rmx-lt/blade-of-grass/blob/development/wiki/Device-CA.md)). 1: after `revoke` (or `crl`) on the PC, copy `root.pem` and `crl.pem` from `%USERPROFILE%\.rmx-device-ca` to `services/mosquitto/config/device-ca/` in a PR to `development`; check they are the public files (`BEGIN X509 CRL`, never a key). 2: merge to `production` and deploy; no disconnects. Redeploy the CRL before its `nextUpdate`, or Mosquitto refuses every device.
 - On 8883, `use_username_as_clientid true`: the client ID is always the username. A second login as `mower-01` replaces the first (the broker logs "session taken over"), so one device can't kick another off by copying its client ID.
-- **No MQTT for browsers** (the production design, since 2026-10-20): browsers talk only to the app (HTTPS and its WebSocket, with a session); only devices (8883) and the app (1883) talk to the broker. The WebSocket listener 9001, Caddy's `wss://mqtt.rmx.lt/mqtt` route and the `probe-web` login were removed. That also closed the client-ID takeover over WebSockets (`use_username_as_clientid` was off on 9001) and means Mosquitto sees every device's real IP.
+- **No MQTT for browsers** (the production design, since 2026-10-20): browsers talk only to the app (HTTPS and its WebSocket, with a session); devices use 8883 (password) or 8884 (certificate), and the app uses 1883. The WebSocket listener 9001, Caddy's `wss://mqtt.rmx.lt/mqtt` route and the `probe-web` login were removed. That also closed the client-ID takeover over WebSockets (`use_username_as_clientid` was off on 9001) and means Mosquitto sees every device's real IP.
 - Persistence on (`data/store/mosquitto.db`, saved every 5 min and on shutdown): retained messages and persistent sessions survive restarts.
 - Logs go to stdout: `docker compose logs -f mosquitto`. They contain client IP addresses, so don't paste them into this repo.
 
@@ -498,7 +505,8 @@ The app login itself lives in the probe database (`users` table, Argon2id hash);
 |---|---|---|
 | `https://api.rmx.lt/probe/` | probe-app: the page with its login form (public), `/probe/api/…`, `/probe/ws` | The app's own login, user `probe` (session cookie) |
 | `https://api.rmx.lt/probe/health` | probe-app health JSON (200 / 503) | None (only up/down and the version) |
-| `mqtts://mqtt.rmx.lt:8883` | Mosquitto (devices only, e.g. `mower-01`) | MQTT login per device |
+| `mqtts://mqtt.rmx.lt:8883` | Mosquitto (password logins, e.g. `mower-01` until it moves to a certificate) | MQTT login per device |
+| `mqtts://mqtt.rmx.lt:8884` | Mosquitto (device client certificates) | Certificate CN, no password |
 
 **Login** (since 2026-10-19; before that, Caddy basic auth): the app has its own login page and server-side sessions. After login the browser holds an `HttpOnly`, `Secure`, `SameSite=Strict` cookie (`__Secure-probe_session`, `Path=/probe`); the app checks it on every API request and on the WebSocket handshake, which also fixed WSS on iPhones (WebKit sends cookies on WebSocket handshakes, but not basic-auth credentials). Requests that change something and WebSocket handshakes must come from `https://api.rmx.lt` (`ALLOWED_ORIGINS` in `probe/compose.yaml`), and failed logins slow down (per username and IP). Why each choice: [Server-App → Login and sessions](Server-App#login-and-sessions).
 
@@ -573,6 +581,7 @@ Then on the server, replace the key part of the one line in `/home/deploy/.ssh/a
 | Stop all services (keep everything) | `cd /opt/rmx-vps/services && docker compose down` |
 | Stop only Mosquitto | `docker compose stop mosquitto` |
 | Close 8883 | `sudo ufw delete allow 8883/tcp`. Also stop Mosquitto, because Docker keeps the port open without ufw |
+| Close 8884 | `sudo ufw delete allow 8884/tcp`. Also stop Mosquitto, because Docker keeps the port open without ufw |
 | Remove Mosquitto completely | `docker compose rm -sf mosquitto`; `sudo systemctl disable --now rmx-mqtt-cert-sync.timer`; `sudo rm /etc/systemd/system/rmx-mqtt-cert-sync.* /usr/local/sbin/rmx-mqtt-cert-sync && sudo systemctl daemon-reload`; `sudo rm -rf /opt/rmx-vps/services/mosquitto/data` (logins and retained messages are lost); remove the `mqtt.rmx.lt` block from the Caddyfile and the `include` line from `services/compose.yaml` |
 | Close 80/443 | `sudo ufw delete allow 80/tcp && sudo ufw delete allow 443/tcp`. Also stop Caddy, because Docker keeps the ports open without ufw |
 | Remove the probe completely | See [Probe → Remove](#remove) |

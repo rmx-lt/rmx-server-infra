@@ -45,6 +45,70 @@
     mode: "0644"
   notify: Reload mosquitto
 
+# Public device CA files (wiki Device-CA). No placeholders: the listener
+# exists only when both files are in the checkout. A CRL change reloads
+# with SIGHUP. Creating or deleting 8884.conf restarts, because a reload
+# does not bind a new port.
+- name: Device CA certificate and CRL
+  ansible.builtin.stat:
+    path: "{{ services_dir }}/mosquitto/config/device-ca/{{ item }}"
+    checksum_algorithm: sha1
+  loop:
+    - root.pem
+    - crl.pem
+  register: device_ca_files
+
+- name: Device CA files are readable
+  ansible.builtin.file:
+    path: "{{ item.stat.path }}"
+    mode: "0644"
+  loop: "{{ device_ca_files.results }}"
+  when: item.stat.exists | default(false)
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Device certificate listener
+  ansible.builtin.copy:
+    dest: "{{ services_dir }}/mosquitto/config/device-listener/8884.conf"
+    # Same owner as the rest of the repo checkout: the "Repo files owned by
+    # the admin user" task chowns everything else, and root here made run 2 differ.
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0644"
+    content: |
+      # Written by Ansible when device-ca/root.pem and crl.pem both exist.
+      listener 8884
+      protocol mqtt
+      certfile /mosquitto/certs/fullchain.pem
+      keyfile /mosquitto/certs/privkey.pem
+      cafile /mosquitto/config/device-ca/root.pem
+      crlfile /mosquitto/config/device-ca/crl.pem
+      require_certificate true
+      use_identity_as_username true
+      use_username_as_clientid true
+      tls_version tlsv1.2
+  when: device_ca_files.results | selectattr('stat.exists') | list | length == 2
+  notify: Restart mosquitto
+
+- name: No device certificate listener without the CA files
+  ansible.builtin.file:
+    path: "{{ services_dir }}/mosquitto/config/device-listener/8884.conf"
+    state: absent
+  when: device_ca_files.results | selectattr('stat.exists') | list | length != 2
+  notify: Restart mosquitto
+
+- name: Device CA reload stamp
+  ansible.builtin.copy:
+    dest: "{{ services_dir }}/mosquitto/data/.device-ca.sha1"
+    content: |
+      {% for item in device_ca_files.results %}
+      {{ item.item }} {{ item.stat.checksum | default('absent') }}
+      {% endfor %}
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload mosquitto
+
 # mosquitto_passwd salts every hash, so it can't be re-run on each play
 # without "changing" everything. A login is added when it is missing; to
 # change a password, edit the vault and run with -e reset_mqtt_passwords=true
