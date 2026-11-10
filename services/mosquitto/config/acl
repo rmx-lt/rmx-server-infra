@@ -26,16 +26,10 @@ pattern read mower/status/server
 # --- rmx-server-app (see wiki Server-Infra §10 "Probe") ---------------------------
 # Topics: mower/<client-id>/req (device -> server), mower/<client-id>/res
 # (server -> device), mower/events/records, mower/status/server (retained).
-# The old probe/ topics stay until the gateway runs as mower-01 on mower/;
-# then the probe/# line and the probe-device block go.
+# The ESP32 gateway runs as login mower-01 on mower/mower-01/req|res
+# (verified on hardware 2026-11-10). The old probe/# grant and the
+# probe-device user block are removed. The probe-device MQTT login stays
+# in the vault until that epic's final cleanup; this file gives it no
+# user entry.
 user probe-app
 topic readwrite mower/#
-topic readwrite probe/#
-
-# Legacy: the ESP32 gateway's old login (client id is always "probe-device"):
-# its old request/response pair plus the old shared events and status.
-user probe-device
-topic write probe/req/probe-device
-topic read probe/res/probe-device
-topic read probe/events/#
-topic read probe/status/#
