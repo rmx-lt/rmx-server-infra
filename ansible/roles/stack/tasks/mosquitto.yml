@@ -179,6 +179,30 @@
   changed_when: true
   notify: Reload mosquitto
 
+# The vault is the list of password logins: delete the others (e.g. the
+# gateway's old mower-01 password, issue 79). Devices log in on 8884 with
+# a certificate, which needs no entry here.
+- name: Delete logins that are not in the vault
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - none
+      - -v
+      - "{{ services_dir }}/mosquitto/data/auth:/mosquitto/auth"
+      - --user
+      - "1883"
+      - "{{ mosquitto_image }}"
+      - mosquitto_passwd
+      - -D
+      - /mosquitto/auth/passwd
+      - "{{ item }}"
+  loop: "{{ mqtt_have.stdout_lines | reject('in', vault_mosquitto_users.keys() | list) | select | list }}"
+  changed_when: true
+  notify: Reload mosquitto
+
 - name: Plain-text copies of the logins (for you)
   ansible.builtin.copy:
     dest: "{{ services_dir }}/mosquitto/data/credentials.txt"

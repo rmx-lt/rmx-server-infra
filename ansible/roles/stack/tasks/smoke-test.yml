@@ -1,5 +1,5 @@
 # The server answers: sites over HTTPS (through localhost, so DNS doesn't
-# matter), the /fw/ login, and MQTT's TLS port.
+# matter) and MQTT's TLS port.
 
 - name: Sites answer over HTTPS
   ansible.builtin.command: >
@@ -14,7 +14,6 @@
   loop:
     - { host: rmx.lt, path: /, expect: "200" }
     - { host: api.rmx.lt, path: /, expect: "200" }
-    - { host: api.rmx.lt, path: /fw/probe/x.bin, expect: "401" }
     - { host: www.rmx.lt, path: /, expect: "301" }
   loop_control: { label: "{{ item.host }}{{ item.path }} -> {{ item.expect }}" }
 

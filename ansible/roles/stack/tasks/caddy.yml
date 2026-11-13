@@ -1,5 +1,5 @@
-# Caddy's server-only files: OTA images folder and the /fw/ download logins.
-# The users file must exist or Caddy won't start (wiki Server-Infra §10 "Firmware images").
+# The firmware images folder. probe-app serves it over MQTT (FIRMWARE_DIR);
+# Caddy no longer serves it (wiki Server-Infra §10 "Firmware images").
 
 - name: Caddy folders
   ansible.builtin.file:
@@ -39,27 +39,9 @@
   loop_control:
     label: "{{ item.path | basename }}"
 
-- name: /fw/ logins (bcrypt hashes, what Caddy reads)
-  ansible.builtin.copy:
-    dest: "{{ services_dir }}/caddy/private/fw-users.caddy"
-    content: |
-      {% for u in vault_caddy_fw_users %}
-      {{ u.name }} {{ u.hash }}
-      {% endfor %}
-    owner: root
-    group: root
-    mode: "0600"
-  no_log: true
-  notify: Restart caddy
-
-- name: /fw/ logins (plain-text copy for you)
-  ansible.builtin.copy:
-    dest: "{{ services_dir }}/caddy/private/credentials.txt"
-    content: |
-      {% for u in vault_caddy_fw_users %}
-      {{ u.name }} {{ u.password }}
-      {% endfor %}
-    owner: root
-    group: root
-    mode: "0600"
-  no_log: true
+# /fw/ was removed (issue 79): firmware goes over MQTT. Delete its old logins.
+- name: Old /fw/ login files are gone
+  ansible.builtin.file:
+    path: "{{ services_dir }}/caddy/private/{{ item }}"
+    state: absent
+  loop: [fw-users.caddy, credentials.txt]

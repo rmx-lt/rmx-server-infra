@@ -40,17 +40,6 @@ pairs() { awk 'NF==2 {print "  " $1 ": " $2}' "$1" 2>/dev/null || true; }
 	echo "vault_mosquitto_users:"
 	pairs "$SERVICES/mosquitto/data/credentials.txt"
 	echo
-	echo "vault_caddy_fw_users:"
-	if [[ -f $SERVICES/caddy/private/fw-users.caddy ]]; then
-		while read -r name hash; do
-			[[ -n $name ]] || continue
-			pw=$(awk -v n="$name" '$1==n {print $2}' "$SERVICES/caddy/private/credentials.txt" 2>/dev/null || true)
-			echo "  - name: $name"
-			echo "    password: ${pw:-change-me}"
-			echo "    hash: '$hash'"
-		done <"$SERVICES/caddy/private/fw-users.caddy"
-	fi
-	echo
 	echo "vault_probe_db_password: $(sed -n 's/^PROBE_DB_PASSWORD=//p' "$SERVICES/probe/.env" 2>/dev/null | head -1 | grep . || echo change-me)"
 	echo "vault_probe_app_users:"
 	awk '$1=="app-login" {print "  " $2 ": " $3}' "$SERVICES/probe/data/credentials.txt" 2>/dev/null || true
