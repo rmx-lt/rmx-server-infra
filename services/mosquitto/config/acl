@@ -3,7 +3,8 @@
 #   sudo install -o 1883 -g 1883 -m 0600 config/acl data/auth/acl
 #   docker compose kill -s HUP mosquitto
 #
-# Topics per mower (<id> = the mower's username, e.g. mower-01):
+# Topics per mower (<id> = the mower's username: the certificate CN on 8884,
+# e.g. mower-01, or the login name on 8883):
 #   mower/<id>/telemetry   mower -> server
 #   mower/<id>/status      mower -> server, retained, also the last-will ("offline")
 #   mower/<id>/cmd         server -> mower (command with ID and expiry)
@@ -26,10 +27,6 @@ pattern read mower/status/server
 # --- rmx-server-app (see wiki Server-Infra §10 "Probe") ---------------------------
 # Topics: mower/<client-id>/req (device -> server), mower/<client-id>/res
 # (server -> device), mower/events/records, mower/status/server (retained).
-# The ESP32 gateway runs as login mower-01 on mower/mower-01/req|res
-# (verified on hardware 2026-11-10). The old probe/# grant and the
-# probe-device user block are removed. The probe-device MQTT login stays
-# in the vault until that epic's final cleanup; this file gives it no
-# user entry.
+# The ESP32 gateway mower-01 logs in with its client certificate on 8884.
 user probe-app
 topic readwrite mower/#

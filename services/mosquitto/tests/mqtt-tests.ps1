@@ -3,7 +3,7 @@
 # Run from the repo folder:
 #   powershell -ExecutionPolicy Bypass -File services\mosquitto\tests\mqtt-tests.ps1
 # Passwords are read from the server into memory only and never printed.
-# Uses the logins app + mower-01 and the topics mower/mower-01/... and mower/mower-02/...
+# Uses the logins app + mower-test and the topics mower/mower-test/... and mower/mower-02/...
 $ErrorActionPreference = 'Continue'
 $H = 'mqtt.rmx.lt'
 $bin = 'C:\Program Files\mosquitto'
@@ -30,8 +30,8 @@ function Result($name, $ok, $detail) {
 $pw = @{}
 ssh -o BatchMode=yes rmx-vps 'sudo cat /opt/rmx-vps/services/mosquitto/data/credentials.txt' |
     Where-Object { $_ -notmatch '^#' -and $_ } | ForEach-Object { $u, $p = $_ -split ' ', 2; $pw[$u] = $p }
-if (-not $pw['app'] -or -not $pw['mower-01']) { throw 'could not read credentials' }
-$app = @('-u', 'app', '-P', $pw['app']); $m1 = @('-u', 'mower-01', '-P', $pw['mower-01'])
+if (-not $pw['app'] -or -not $pw['mower-test']) { throw 'could not read credentials' }
+$app = @('-u', 'app', '-P', $pw['app']); $m1 = @('-u', 'mower-test', '-P', $pw['mower-test'])
 
 # Start a subscriber as its own process (output to a temp file).
 # mosquitto_sub's -W timeout doesn't work on Windows, so Stop-Sub waits and kills it.
@@ -68,64 +68,64 @@ try {
     Result 'TLS 1.1 refused' $false "negotiated $($ssl.SslProtocol)"
 } catch { Result 'TLS 1.1 refused' $true 'handshake failed (as expected)' } finally { if ($tcp) { $tcp.Dispose() } }
 
-# 2. mower-01 publishes telemetry, app receives it
+# 2. mower-test publishes telemetry, app receives it
 $j = Start-Sub $app 'mower/+/telemetry'
-& $pub @tls @m1 -t 'mower/mower-01/telemetry' -m '{"test":"telemetry"}' -q 1 2>&1 | Out-Null
+& $pub @tls @m1 -t 'mower/mower-test/telemetry' -m '{"test":"telemetry"}' -q 1 2>&1 | Out-Null
 $out = Stop-Sub $j
-Result 'mower-01 publishes own telemetry' ("$out" -match 'mower/mower-01/telemetry .*telemetry') "$out"
+Result 'mower-test publishes own telemetry' ("$out" -match 'mower/mower-test/telemetry .*telemetry') "$out"
 
-# 3. app sends a command, mower-01 (subscribed to its cmd topic) receives it
-$j = Start-Sub $m1 'mower/mower-01/cmd'
-& $pub @tls @app -t 'mower/mower-01/cmd' -m '{"id":"t1","cmd":"noop"}' -q 1 2>&1 | Out-Null
+# 3. app sends a command, mower-test (subscribed to its cmd topic) receives it
+$j = Start-Sub $m1 'mower/mower-test/cmd'
+& $pub @tls @app -t 'mower/mower-test/cmd' -m '{"id":"t1","cmd":"noop"}' -q 1 2>&1 | Out-Null
 $out = Stop-Sub $j
-Result 'mower-01 subscribes to own cmd' ("$out" -match 'mower/mower-01/cmd .*noop') "$out"
+Result 'mower-test subscribes to own cmd' ("$out" -match 'mower/mower-test/cmd .*noop') "$out"
 
-# 4. Retained status: mower-01 publishes retained "online"; a later subscriber gets it
-& $pub @tls @m1 -t 'mower/mower-01/status' -m 'online' -r -q 1 2>&1 | Out-Null
-$out = Stop-Sub (Start-Sub $app 'mower/mower-01/status') 5
+# 4. Retained status: mower-test publishes retained "online"; a later subscriber gets it
+& $pub @tls @m1 -t 'mower/mower-test/status' -m 'online' -r -q 1 2>&1 | Out-Null
+$out = Stop-Sub (Start-Sub $app 'mower/mower-test/status') 5
 Result 'retained status kept' ("$out" -match 'status online') "$out"
 
-# 5. mower-01 listens on mower-02's cmd topic (and on all of mower/#): the app's command must not reach it
+# 5. mower-test listens on mower-02's cmd topic (and on all of mower/#): the app's command must not reach it
 $j1 = Start-Sub $m1 'mower/mower-02/cmd'
 & $pub @tls @app -t 'mower/mower-02/cmd' -m 'secret-cmd' -q 1 2>&1 | Out-Null
 $out = Stop-Sub $j1 5
-Result 'mower-01 gets nothing from mower-02 topics' (-not ("$out" -match 'secret-cmd')) "mower-01 saw: $(if ($out) { $out } else { 'nothing' })"
+Result 'mower-test gets nothing from mower-02 topics' (-not ("$out" -match 'secret-cmd')) "mower-test saw: $(if ($out) { $out } else { 'nothing' })"
 $j1 = Start-Sub $m1 'mower/#'
 & $pub @tls @app -t 'mower/mower-02/telemetry' -m 'other-mower' -q 1 2>&1 | Out-Null
 $out = Stop-Sub $j1 5
-Result 'mower-01 wildcard sees no other mower' (-not ("$out" -match 'other-mower')) "mower-01 saw: $(if ($out) { $out } else { 'nothing' })"
+Result 'mower-test wildcard sees no other mower' (-not ("$out" -match 'other-mower')) "mower-test saw: $(if ($out) { $out } else { 'nothing' })"
 
-# 6. mower-01 publishes to mower-02's topic: refused (app listens to check nothing arrives)
+# 6. mower-test publishes to mower-02's topic: refused (app listens to check nothing arrives)
 $j = Start-Sub $app 'mower/mower-02/#'
 $out = & $pub @tls @m1 -t 'mower/mower-02/telemetry' -m 'spoof' -q 1 2>&1
 $got = Stop-Sub $j 5
-Result 'mower-01 cannot publish to mower-02' (-not ("$got" -match 'spoof')) "pub said: $(if ($out) { $out } else { '(nothing)' }) | app saw: $(if ("$got" -match 'spoof') { 'spoof!' } else { 'nothing' })"
+Result 'mower-test cannot publish to mower-02' (-not ("$got" -match 'spoof')) "pub said: $(if ($out) { $out } else { '(nothing)' }) | app saw: $(if ("$got" -match 'spoof') { 'spoof!' } else { 'nothing' })"
 
 # 7. Anonymous refused
-$out = & $pub @tls -t 'mower/mower-01/telemetry' -m 'anon' 2>&1
+$out = & $pub @tls -t 'mower/mower-test/telemetry' -m 'anon' 2>&1
 Result 'anonymous refused' ("$out" -match 'not authori|refused|bad user') "$out"
 
 # 8. Wrong password refused
-$out = & $pub @tls -u 'mower-01' -P 'wrong-password' -t 'mower/mower-01/telemetry' -m 'x' 2>&1
+$out = & $pub @tls -u 'mower-test' -P 'wrong-password' -t 'mower/mower-test/telemetry' -m 'x' 2>&1
 Result 'wrong password refused' ("$out" -match 'not authori|refused|bad user') "$out"
 
-# 9. Client ID is forced to the username: a 2nd mower-01 login replaces the 1st
-$j = Start-Sub ($m1 + @('-i', 'first')) 'mower/mower-01/cmd'
-& $pub @tls @m1 -i 'second' -t 'mower/mower-01/telemetry' -m 'x' 2>&1 | Out-Null
+# 9. Client ID is forced to the username: a 2nd mower-test login replaces the 1st
+$j = Start-Sub ($m1 + @('-i', 'first')) 'mower/mower-test/cmd'
+& $pub @tls @m1 -i 'second' -t 'mower/mower-test/telemetry' -m 'x' 2>&1 | Out-Null
 $null = Stop-Sub $j 3
 # Filtered here, not with grep on the server: Windows PowerShell 5.1 mangles
 # double quotes inside native-command arguments.
 $log = ssh -o BatchMode=yes rmx-vps 'docker compose -f /opt/rmx-vps/services/compose.yaml logs --no-log-prefix --since 30s mosquitto 2>&1' |
     Select-String -Pattern 'already connected|closing old|session taken over' |
     Select-Object -Last 2 | ForEach-Object { $_.Line -replace '\d+\.\d+\.\d+\.\d+', 'PC-IP' }
-Result 'client ID forced to username' ("$log" -match 'mower-01') "server log: $log"
+Result 'client ID forced to username' ("$log" -match 'mower-test') "server log: $log"
 
 # 10. Plain MQTT port 1883 not reachable from the internet
 $t = Test-NetConnection $H -Port 1883 -WarningAction SilentlyContinue
 Result 'port 1883 closed' (-not $t.TcpTestSucceeded) "TcpTestSucceeded=$($t.TcpTestSucceeded)"
 
 # Clean up: clear the retained test status
-& $pub @tls @m1 -t 'mower/mower-01/status' -n -r -q 1 2>&1 | Out-Null
+& $pub @tls @m1 -t 'mower/mower-test/status' -n -r -q 1 2>&1 | Out-Null
 $pw.Clear()
 
 $results | Format-Table -AutoSize -Wrap
