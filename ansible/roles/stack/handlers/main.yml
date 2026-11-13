@@ -17,7 +17,9 @@
     set -o pipefail
     if docker compose kill -s HUP mosquitto; then
       for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-        if docker compose logs --since 30s mosquitto 2>&1 | grep -q 'Reloading config.'; then
+        # grep reads the whole log: with -q it would exit on the first match,
+        # docker compose logs would die of SIGPIPE and pipefail would fail (issue 82).
+        if docker compose logs --since 30s mosquitto 2>&1 | grep -F 'Reloading config.' >/dev/null; then
           echo reloaded
           exit 0
         fi
