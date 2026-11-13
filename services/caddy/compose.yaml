@@ -11,9 +11,6 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./site:/srv/site:ro
-      # OTA firmware images (/fw/*) and their download logins (server only, gitignored)
-      - ./firmware:/srv/fw:ro
-      - ./private:/etc/caddy/private:ro
       # Certificates and keys live here (gitignored, server only)
       - ./data/data:/data
       - ./data/config:/config

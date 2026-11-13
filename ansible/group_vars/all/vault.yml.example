@@ -15,27 +15,21 @@ vault_ssh_host_keys:
       -----END OPENSSH PRIVATE KEY-----
     public: ssh-ed25519 AAAA... root@vps3124
 
-# Mosquitto logins: user -> password. probe-app's password is also given to
-# the probe (probe/.env); mower and device passwords are in their firmware.
+# Mosquitto password logins on 8883: user -> password. probe-app's password
+# is also the app's (probe/.env). Devices log in with a client certificate on
+# 8884 and have no password (wiki Device-CA). mower-test is the login of the
+# ACL tests (services/mosquitto/tests/mqtt-tests.ps1). The playbook deletes
+# logins that are not in this list.
 vault_mosquitto_users:
   app: change-me
-  mower-01: change-me
+  mower-test: change-me
   probe-app: change-me
-  probe-device: change-me
-
-# Download logins for /fw/* (HTTP basic auth). hash = bcrypt of password:
-#   cd /opt/rmx-vps/services && docker compose exec caddy caddy hash-password --plaintext "$P"
-vault_caddy_fw_users:
-  - name: probe-device
-    password: change-me
-    hash: $2a$14$...
 
 # rmx-server-app: database password (letters and digits only, it goes
 # into a URL) and the app's own logins.
 vault_probe_db_password: change-me
 vault_probe_app_users:
   probe: change-me
-  probe-device: change-me
 
 # Public key of the GitHub Actions deploy key (rmx-server-app secret
 # DEPLOY_SSH_KEY). It only gets the forced deploy command.

@@ -1,5 +1,0 @@
-# Download logins for /fw/* (HTTP basic auth), one line per device: <user> <bcrypt hash>.
-# Server only: copy to private/fw-users.caddy (gitignored), never commit the real file.
-# Make a hash (the password goes to the device's sdkconfig, CONFIG_PROBE_OTA_PASSWORD):
-#   cd /opt/rmx-vps/services && docker compose exec caddy caddy hash-password --plaintext "$P"
-probe-device $2a$14$REPLACE_WITH_THE_HASH_FROM_caddy_hash-password

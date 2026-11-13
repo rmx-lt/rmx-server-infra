@@ -37,24 +37,6 @@ api.rmx.lt {
 		reverse_proxy probe-app:8080
 	}
 
-	# Firmware images for OTA updates of the LTE modem board
-	# (rmx-mower-gateway): GET /fw/probe/<version>.bin, read-only from
-	# caddy/firmware/ on the host. HTTP basic auth, one login per device; the
-	# logins (bcrypt hashes) are server only in caddy/private/fw-users.caddy
-	# (template: fw-users.caddy.example). That file must exist or Caddy won't
-	# start; an empty one locks /fw/ (401 for everyone). The images are signed
-	# and the device checks the signature, so the login only keeps casual
-	# downloads away. Range requests work (the device resumes a dropped
-	# download); no directory listings (404).
-	@fw path /fw/*
-	handle @fw {
-		basic_auth {
-			import private/fw-users.caddy
-		}
-		root * /srv
-		file_server
-	}
-
 	handle {
 		header Content-Type application/json
 		respond `{"service":"rmx-api","status":"placeholder"}` 200

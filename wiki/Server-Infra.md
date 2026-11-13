@@ -284,9 +284,7 @@ services/
 │   ├── compose.yaml      # Caddy container
 │   ├── Caddyfile         # sites, TLS, redirects
 │   ├── site/index.html   # placeholder page for rmx.lt
-│   ├── fw-users.caddy.example  # template for private/fw-users.caddy (download logins for /fw/*)
-│   ├── firmware/         # (server only, gitignored) OTA images, served at /fw/
-│   ├── private/          # (server only, gitignored) fw-users.caddy
+│   ├── firmware/         # (server only, gitignored) OTA images; probe-app sends them over MQTT
 │   └── data/             # (server only, gitignored) certificates + Caddy state
 ├── mosquitto/
 │   ├── compose.yaml      # Mosquitto container
@@ -331,7 +329,6 @@ Not public (reachable only by containers on `rmx_edge`): Mosquitto's plain MQTT 
 - Sites:
   - `https://rmx.lt`: static placeholder page from `site/`
   - `https://api.rmx.lt`: placeholder JSON `{"service":"rmx-api","status":"placeholder"}`, except `/probe` and `/probe/*` → probe-app:8080 (prefix kept). The app does its own login (see [Probe](#probe-rmx-server-app)); Caddy adds no auth. When the probe is off, `/probe/*` answers 502
-  - `https://api.rmx.lt/fw/*`: OTA firmware images, static files with HTTP basic auth (see [Firmware images](#firmware-images-ota))
   - `https://www.rmx.lt/…` → **301** to `https://rmx.lt/…`
   - `https://mqtt.rmx.lt`: a one-line text. The block exists so that Caddy obtains and renews the certificate Mosquitto uses (see [Mosquitto](#mosquitto-mqtt)). No MQTT goes through Caddy
   - every `http://…` → **308** to `https://…`
@@ -340,28 +337,11 @@ Not public (reachable only by containers on `rmx_edge`): Mosquitto's plain MQTT 
 
 ### Firmware images (OTA)
 
-The LTE modem board ([rmx-mower-gateway](https://github.com/rmx-lt/rmx-mower-gateway), wiki [Mower-Gateway → Firmware updates](Mower-Gateway#firmware-updates-ota)) downloads new firmware from `https://api.rmx.lt/fw/probe/<version>.bin`.
+The LTE modem board ([rmx-mower-gateway](https://github.com/rmx-lt/rmx-mower-gateway), wiki [Mower-Gateway → Firmware updates](Mower-Gateway#firmware-updates-ota)) downloads new firmware over MQTT from probe-app (wiki [Server-App → Firmware over MQTT](Server-App)). There is no HTTPS download: Caddy's `/fw/` route and its basic-auth logins were removed on 2026-11-13 ([issue 79](https://github.com/rmx-lt/rmx-server-infra/issues/79)).
 
-- Files: `services/caddy/firmware/` on the host → `/srv/fw` in Caddy, read-only. `firmware/probe/<version>.bin` is served as `/fw/probe/<version>.bin`. Range requests work (the device resumes dropped downloads); directories give 404, not a listing.
-- probe-app: the same `firmware/probe/` directory is mounted read-only at `/firmware` (`FIRMWARE_DIR=/firmware` in `probe/compose.yaml`), and the app serves those `*.bin` files to devices over MQTT. The image runs as uid 65532, which is not in the admin user's group. Ansible creates `firmware/` and `firmware/probe/` mode `0755` and sets every file under `services/caddy/firmware/` to `0644`. `caddy/private/` stays root `0700`. An upload from `tools\release.ps1` can land owner-only; the next play makes it readable.
-- Login: HTTP basic auth, one login per device, in `services/caddy/private/fw-users.caddy` (server only, gitignored; template [`fw-users.caddy.example`](https://github.com/rmx-lt/rmx-server-infra/blob/development/services/caddy/fw-users.caddy.example)). Plain-text copies go in `caddy/private/credentials.txt` (root, `0600`). **The file must exist or Caddy won't start**; an empty file locks `/fw/` (401 for everyone). Tested with Caddy 2.11.2 (2026-10-22, locally): no login 401, wrong password 401, right one 200, `Range` 206, directory 404, missing users file = config error, empty file = 401.
-- Trust: the images are signed with a key that exists only on the PC, and the device refuses an image with any other signature. The login only keeps casual downloads away, so a hacked server can't push its own firmware.
-- Upload: `tools\release.ps1` in rmx-mower-gateway (scp as rmx into `firmware/probe/`).
-
-One-time setup (on the server; create the users file **before** restarting Caddy):
-
-```bash
-cd /opt/rmx-vps/services/caddy
-mkdir -p firmware/probe private
-P=$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-32)
-H=$(cd .. && docker compose exec -T caddy caddy hash-password --plaintext "$P")   # compose from services/, not from caddy/
-echo "probe-device $H" > private/fw-users.caddy
-echo "probe-device $P" | sudo tee private/credentials.txt >/dev/null; sudo chmod 600 private/credentials.txt; unset P H
-cd .. && docker compose up -d caddy        # new mounts: recreate the container
-curl -s -o /dev/null -w "%{http_code}\n" https://api.rmx.lt/fw/probe/x.bin   # 401
-```
-
-Then copy the password into the device's `sdkconfig` (`CONFIG_PROBE_OTA_PASSWORD`) without printing it, the same way as the MQTT password. New device: add a line to `fw-users.caddy`, `docker compose restart caddy`.
+- Files: `services/caddy/firmware/probe/<version>.bin` on the host (the folder name is historical). It is mounted read-only into probe-app at `/firmware` (`FIRMWARE_DIR=/firmware` in `probe/compose.yaml`); Caddy no longer mounts it. The image runs as uid 65532, which is not in the admin user's group. Ansible creates `firmware/` and `firmware/probe/` mode `0755` and sets every file under `services/caddy/firmware/` to `0644`. An upload from `toolselease.ps1` can land owner-only; the next play makes it readable.
+- Trust: the images are signed with a key that exists only on the PC, and the device refuses an image with any other signature, so a hacked server can't push its own firmware. The device only reaches the files over its certificate login.
+- Upload: `toolselease.ps1` in rmx-mower-gateway (scp as rmx into `firmware/probe/`).
 
 ### Mosquitto (MQTT)
 
@@ -375,8 +355,8 @@ Then copy the password into the device's `sdkconfig` (`CONFIG_PROBE_OTA_PASSWORD
 - Settings are global (no `per_listener_settings`): the same `allow_anonymous false`, `password_file` and `acl_file` apply to 8883 and 8884. On 8884 `use_identity_as_username` makes the certificate CN the username, so a CN is checked against the ACL like a login name and no password is used (tested: a valid certificate plus a password still acts as the CN). **A CN of `app` or `probe-app` would get that login's ACL: never sign those names or `events`/`status`.**
 - Applying changes: adding or removing `8884.conf` makes the play run `Restart mosquitto` (one short disconnect; a reload does not bind a new port). The port mapping `8884:8884` in `services/mosquitto/compose.yaml` is applied by `docker compose up -d`, which recreates the container once, the first time this version is deployed (clients reconnect). Replacing `crl.pem` or `root.pem` later is a SIGHUP (`Reload mosquitto`, no disconnects): tested, a newly revoked certificate is refused after the reload. The device sends its certificate plus the issuing certificate (`<name>.chain.pem`); the server stores no device private key.
 - **Current state:** the real device CA was created on 2026-11-10 and its public `root.pem` and `crl.pem` are committed, so the deploy enables 8884. The CRL `nextUpdate` is 2036-11-07; regenerate and redeploy it on every revoke. If either file is removed, the listener is not written and Mosquitto runs on 8883 and 1883 only. **Steps for a new CRL** ([Device-CA](https://github.com/rmx-lt/blade-of-grass/blob/development/wiki/Device-CA.md)). 1: after `revoke` (or `crl`) on the PC, copy `root.pem` and `crl.pem` from `%USERPROFILE%\.rmx-device-ca` to `services/mosquitto/config/device-ca/` in a PR to `development`; check they are the public files (`BEGIN X509 CRL`, never a key). 2: merge to `production` and deploy; no disconnects. Redeploy the CRL before its `nextUpdate`, or Mosquitto refuses every device.
-- On 8883, `use_username_as_clientid true`: the client ID is always the username. A second login as `mower-01` replaces the first (the broker logs "session taken over"), so one device can't kick another off by copying its client ID.
-- **No MQTT for browsers** (the production design, since 2026-10-20): browsers talk only to the app (HTTPS and its WebSocket, with a session); devices use 8883 (password) or 8884 (certificate), and the app uses 1883. The WebSocket listener 9001, Caddy's `wss://mqtt.rmx.lt/mqtt` route and the `probe-web` login were removed. That also closed the client-ID takeover over WebSockets (`use_username_as_clientid` was off on 9001) and means Mosquitto sees every device's real IP.
+- On 8883, `use_username_as_clientid true`: the client ID is always the username. A second login as `mower-test` replaces the first (the broker logs "session taken over"), so one device can't kick another off by copying its client ID.
+- **No MQTT for browsers** (the production design, since 2026-10-20): browsers talk only to the app (HTTPS and its WebSocket, with a session); devices use 8884 (certificate), tools and tests 8883 (password), and the app uses 1883. The WebSocket listener 9001, Caddy's `wss://mqtt.rmx.lt/mqtt` route and the `probe-web` login were removed. That also closed the client-ID takeover over WebSockets (`use_username_as_clientid` was off on 9001) and means Mosquitto sees every device's real IP.
 - Persistence on (`data/store/mosquitto.db`, saved every 5 min and on shutdown): retained messages and persistent sessions survive restarts.
 - Logs go to stdout: `docker compose logs -f mosquitto`. They contain client IP addresses, so don't paste them into this repo.
 
@@ -385,11 +365,11 @@ Then copy the password into the device's `sdkconfig` (`CONFIG_PROBE_OTA_PASSWORD
 | Login | Can use | Purpose |
 |---|---|---|
 | `app` | `mower/#` (read + write) | The backend app (Phase 5) |
-| `mower-01` | `mower/mower-01/#`, read `mower/events/#` and `mower/status/server` | First mower: the ESP32 LTE gateway ([rmx-mower-gateway](https://github.com/rmx-lt/rmx-mower-gateway)) since its move to `mower/` topics (2026-11, issue 53; password in NVS) |
+| `mower-01` (certificate CN, 8884) | `mower/mower-01/#`, read `mower/events/#` and `mower/status/server` | First mower: the ESP32 LTE gateway ([rmx-mower-gateway](https://github.com/rmx-lt/rmx-mower-gateway)). No password: its password login was deleted on 2026-11-13 ([issue 79](https://github.com/rmx-lt/rmx-server-infra/issues/79)) |
+| `mower-test` | `mower/mower-test/#`, the shared reads | Password login of the ACL tests (`services/mosquitto/tests/mqtt-tests.ps1`) |
 | `probe-app` | `mower/#`, read + write | rmx-server-app server |
-| `probe-device` | no ACL user entry. The MQTT login stays in the vault until the epic's final cleanup. Shared patterns still apply to every login, so this one may use `mower/probe-device/#` and may read `mower/events/#` and `mower/status/server`. It has no `probe/` rights | Former gateway login, unused since the ESP32 runs as `mower-01` (verified 2026-11-10) |
 
-The rules in [`config/acl`](https://github.com/rmx-lt/rmx-server-infra/blob/development/services/mosquitto/config/acl): `probe-app` has an explicit `user` entry for `mower/#`; `probe-device` has no user entry. Every login also gets `mower/<its username>/#` (`pattern readwrite mower/%u/#`) and may read the shared server topics `mower/events/#` (change events) and `mower/status/server` (retained online/offline); `events` and `status` are therefore not usable as mower names. The gateway link topics are `mower/<id>/req` and `mower/<id>/res` (see wiki Mower-Gateway-Server-Contract). A new mower needs a login only, no ACL change. Planned topics: `mower/<id>/telemetry`, `mower/<id>/status` (retained, also the last-will), `mower/<id>/cmd`, `mower/<id>/cmd/ack`.
+The rules in [`config/acl`](https://github.com/rmx-lt/rmx-server-infra/blob/development/services/mosquitto/config/acl): `probe-app` has an explicit `user` entry for `mower/#`. Every login also gets `mower/<its username>/#` (`pattern readwrite mower/%u/#`) and may read the shared server topics `mower/events/#` (change events) and `mower/status/server` (retained online/offline); `events` and `status` are therefore not usable as mower names. The gateway link topics are `mower/<id>/req` and `mower/<id>/res` (see wiki Mower-Gateway-Server-Contract). A new mower needs a certificate only ([Device-CA](https://github.com/rmx-lt/blade-of-grass/blob/development/wiki/Device-CA.md)), no login and no ACL change. The password logins are exactly the keys of `vault_mosquitto_users`; the playbook deletes any other login from `passwd`. Planned topics: `mower/<id>/telemetry`, `mower/<id>/status` (retained, also the last-will), `mower/<id>/cmd`, `mower/<id>/cmd/ack`.
 
 How Mosquitto enforces it: a mower may **subscribe** to another mower's topic (the SUBSCRIBE is accepted), but no message from there is ever delivered to it. A **publish** to another mower's topic is dropped; with MQTT 5 and QoS 1 the client is told `Not authorized`.
 
@@ -495,7 +475,7 @@ The whole probe uses about 50–70 MB of RAM while running (measured 2026-10-18:
 |---|---|---|
 | `probe/.env` | rmx, `0600` | `PROBE_DB_PASSWORD`, `PROBE_MQTT_PASSWORD`, and `PROBE_TAG=sha-…`, the deployed image (template: [`.env.example`](https://github.com/rmx-lt/rmx-server-infra/blob/development/services/probe/.env.example)). **Only the deploy script changes `PROBE_TAG`**: a deploy is just "rewrite that line + recreate probe-app". rmx owns the file because `docker compose` (run as rmx) must read it |
 | `probe/data/credentials.txt` | root, `0600` | Plain-text copies: the app login (user `probe`), DB password |
-| `mosquitto/data/credentials.txt` | root, `0600` | Also holds `probe-app` and `probe-device` |
+| `mosquitto/data/credentials.txt` | root, `0600` | Also holds `probe-app` |
 
 The app login itself lives in the probe database (`users` table, Argon2id hash); `credentials.txt` only keeps the plain-text copy for you.
 
@@ -505,7 +485,7 @@ The app login itself lives in the probe database (`users` table, Argon2id hash);
 |---|---|---|
 | `https://api.rmx.lt/probe/` | probe-app: the page with its login form (public), `/probe/api/…`, `/probe/ws` | The app's own login, user `probe` (session cookie) |
 | `https://api.rmx.lt/probe/health` | probe-app health JSON (200 / 503) | None (only up/down and the version) |
-| `mqtts://mqtt.rmx.lt:8883` | Mosquitto (password logins, e.g. `mower-01` until it moves to a certificate) | MQTT login per device |
+| `mqtts://mqtt.rmx.lt:8883` | Mosquitto (password logins: `app`, `probe-app`, `mower-test`) | Password |
 | `mqtts://mqtt.rmx.lt:8884` | Mosquitto (device client certificates) | Certificate CN, no password |
 
 **Login** (since 2026-10-19; before that, Caddy basic auth): the app has its own login page and server-side sessions. After login the browser holds an `HttpOnly`, `Secure`, `SameSite=Strict` cookie (`__Secure-probe_session`, `Path=/probe`); the app checks it on every API request and on the WebSocket handshake, which also fixed WSS on iPhones (WebKit sends cookies on WebSocket handshakes, but not basic-auth credentials). Requests that change something and WebSocket handshakes must come from `https://api.rmx.lt` (`ALLOWED_ORIGINS` in `probe/compose.yaml`), and failed logins slow down (per username and IP). Why each choice: [Server-App → Login and sessions](Server-App#login-and-sessions).
@@ -523,7 +503,6 @@ docker compose exec -T probe-app /app/probe-server delete-user probe            
 
 ```bash
 sudo cat /opt/rmx-vps/services/probe/data/credentials.txt          # app login (user probe), DB password
-sudo awk '$1=="probe-device"{print $2}' /opt/rmx-vps/services/mosquitto/data/credentials.txt   # leftover MQTT login; no ACL user entry. The gateway is mower-01
 ```
 
 **Turn on / off** (on the server, in `/opt/rmx-vps/services`; leave it off when you're done):
@@ -570,7 +549,7 @@ Then on the server, replace the key part of the one line in `/home/deploy/.ssh/a
 
 - Stop and delete the containers: `docker compose rm -sf probe-app probe-db`; the data: `sudo rm -rf probe/data`. That deletes the live copy. Restore it from the encrypted deploy backup ([Server-Infra-Ansible](Server-Infra-Ansible)).
 - Deploy access: `sudo rm /etc/sudoers.d/deploy /usr/local/sbin/rmx-deploy-probe && sudo userdel -r deploy`; delete the three `DEPLOY_*` secrets on GitHub (and disable the `deploy` job).
-- MQTT: `mosquitto_passwd -D` for `probe-app` and `probe-device` (see above), remove their lines from `credentials.txt` and the `probe-app` entry from `config/acl`.
+- MQTT: `mosquitto_passwd -D` for `probe-app` (or drop it from the vault), remove their lines from `credentials.txt` and the `probe-app` entry from `config/acl`.
 - Caddy: remove the `@probe` handle.
 - Remove the `probe/compose.yaml` include from `services/compose.yaml`.
 
@@ -592,7 +571,7 @@ Then on the server, replace the key part of the one line in `/home/deploy/.ssh/a
 
 ## 11. Setup as code (Ansible)
 
-[`ansible/`](https://github.com/rmx-lt/rmx-server-infra/tree/development/ansible) describes everything in §3–§10 as code: users, sshd, ufw, fail2ban, swap, unattended security updates, Docker, the Compose stack and its server-only files, cert-sync and the deploy script. Its secrets (SSH host keys, Mosquitto and probe passwords, `/fw/` logins, deploy key) are in `ansible/group_vars/all/vault.yml`, encrypted with Ansible Vault.
+[`ansible/`](https://github.com/rmx-lt/rmx-server-infra/tree/development/ansible) describes everything in §3–§10 as code: users, sshd, ufw, fail2ban, swap, unattended security updates, Docker, the Compose stack and its server-only files, cert-sync and the deploy script. Its secrets (SSH host keys, Mosquitto and probe passwords, deploy key) are in `ansible/group_vars/all/vault.yml`, encrypted with Ansible Vault.
 
 ```bash
 # empty Ubuntu 24.04 VPS, as root (provider dashboard terminal):

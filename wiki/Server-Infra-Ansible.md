@@ -15,7 +15,7 @@ Everything [Server-Infra](Server-Infra) §3–§10 did by hand is in these roles
 
 ## The vault
 
-`vault.yml` holds every secret a rebuild needs: SSH host keys, Mosquitto passwords, the `/fw/` logins, the probe's database and app passwords, the deploy key. It is committed **encrypted** (AES-256, Ansible Vault); the repo is public, so use a long random vault password and keep it in your password manager. Lose it and the vault can't be opened.
+`vault.yml` holds every secret a rebuild needs: SSH host keys, Mosquitto passwords, the probe's database and app passwords, the deploy key. It is committed **encrypted** (AES-256, Ansible Vault); the repo is public, so use a long random vault password and keep it in your password manager. Lose it and the vault can't be opened.
 
 ```bash
 # keep the passwords of the CURRENT server (once, on the old server, before reinstalling)
@@ -39,7 +39,7 @@ Template with every field: [`group_vars/all/vault.yml.example`](https://github.c
 
    It installs git and Ansible, clones this repo to `/opt/rmx-vps`, asks for the vault password and runs the playbook on the server itself. About 10 minutes.
    If it stops with "Could not get lock /var/lib/dpkg/lock-frontend", the fresh image is still running its first-boot update. Wait until `pgrep -x apt-get` prints nothing, then run the line again. The package step prints nothing for a few minutes: don't interrupt it.
-3. Check: the smoke test at the end of the run answers for the sites, `/fw/` login and MQTT's TLS port (passing tasks are not printed; look for `failed=0`). Then `ssh rmx-vps` from the PC (the host key is the same as before, so no warning). Until the playbook has run, the fresh image has its own host key: don't `ssh-keygen -R`, just wait.
+3. Check: the smoke test at the end of the run answers for the sites and MQTT's TLS port (passing tasks are not printed; look for `failed=0`). Then `ssh rmx-vps` from the PC (the host key is the same as before, so no warning). Until the playbook has run, the fresh image has its own host key: don't `ssh-keygen -R`, just wait.
 4. Start the probe: `bash /opt/rmx-vps/ansible/bootstrap.sh -e probe=on`.
 5. Get the data back (probe database, Mosquitto store, firmware images, probe tag). On the PC, download the newest `rmx-backup-<sha>` artifact of the `deploy` workflow (`gh run download <run-id> -R rmx-lt/rmx-server-infra`), decrypt it with `age -d -i age.key -o backup.tar.gz <file>` (in PowerShell never `>`: it corrupts binary files), then:
 
