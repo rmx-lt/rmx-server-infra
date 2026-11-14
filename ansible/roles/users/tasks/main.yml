@@ -60,7 +60,7 @@
   ansible.builtin.copy:
     dest: /home/deploy/.ssh/authorized_keys
     content: >
-      restrict,command="sudo -n /usr/local/sbin/rmx-deploy-probe \"$SSH_ORIGINAL_COMMAND\""
+      restrict,command="sudo -n /usr/local/sbin/rmx-deploy-app \"$SSH_ORIGINAL_COMMAND\""
       {{ vault_deploy_ssh_key }}
     owner: deploy
     group: deploy
@@ -68,7 +68,7 @@
 
 - name: Deploy user may run the deploy script, nothing else
   ansible.builtin.copy:
-    src: "{{ repo_src }}/services/probe/deploy/sudoers-deploy"
+    src: "{{ repo_src }}/services/app/deploy/sudoers-deploy"
     dest: /etc/sudoers.d/deploy
     mode: "0440"
     validate: visudo -cf %s

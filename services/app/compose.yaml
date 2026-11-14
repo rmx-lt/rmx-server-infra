@@ -1,31 +1,26 @@
-# rmx-server-app: a learning/diagnostic app (github.com/rmx-lt/rmx-server-app)
-# and a rehearsal of the production deploy. See wiki Server-Infra §10 "Probe".
+# rmx-server-app (github.com/rmx-lt/rmx-server-app): the app and its database.
+# See wiki Server-Infra §10 "App". Always on: no profile.
 #
-# Compose profile "probe": OFF by default. A plain `docker compose up -d`
-# ignores these two services. Turn on / off:
-#   docker compose --profile probe up -d
-#   docker compose stop probe-app probe-db
-# (Not `--profile probe stop` without names: that stops Caddy and Mosquitto too.)
-#
-# Variables come from probe/.env (server only, gitignored; template
+# Variables come from app/.env (server only, gitignored; template
 # .env.example), read automatically for this included file: the passwords,
-# and PROBE_TAG=sha-xxxxxxx, the deployed image, rewritten by the deploy
+# and APP_TAG=sha-xxxxxxx, the deployed image, rewritten by the deploy
 # script. No ${VAR:?} checks: they would break `docker compose` for the
 # whole stack (Caddy, Mosquitto) whenever the file is missing.
-# No ports are published: Caddy reaches probe-app over rmx_edge,
-# and only probe-app reaches probe-db over rmx_backend.
+# No ports are published: Caddy reaches app over rmx_edge,
+# and only app reaches db over rmx_backend.
+# Never `docker compose stop|down` without service names (that also stops
+# Caddy and Mosquitto); stop `app` and `db` only when the owner asks.
 
 services:
-  probe-db:
+  db:
     image: timescale/timescaledb:2.30.2-pg17
-    profiles: [probe]
     restart: unless-stopped
     mem_limit: 256m
     shm_size: 64m
     environment:
-      POSTGRES_USER: probe
-      POSTGRES_DB: probe
-      POSTGRES_PASSWORD: ${PROBE_DB_PASSWORD}
+      POSTGRES_USER: app
+      POSTGRES_DB: app
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD}
       # Skip timescaledb-tune at first start; the settings are below.
       NO_TS_TUNE: "true"
     # Tuned for the 1 GB VPS: small buffers, few connections and workers.
@@ -58,41 +53,40 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U probe -d probe"]
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
-  probe-app:
-    image: ghcr.io/rmx-lt/rmx-backend-probe:${PROBE_TAG}
-    profiles: [probe]
+  app:
+    image: ghcr.io/rmx-lt/rmx-server-app:${APP_TAG}
     restart: unless-stopped
     mem_limit: 64m
     depends_on:
-      probe-db:
+      db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://probe:${PROBE_DB_PASSWORD}@probe-db:5432/probe
+      DATABASE_URL: postgres://app:${APP_DB_PASSWORD}@db:5432/app
       MQTT_HOST: mosquitto
       MQTT_PORT: "1883"
-      MQTT_USERNAME: probe-app
-      MQTT_PASSWORD: ${PROBE_MQTT_PASSWORD}
+      MQTT_USERNAME: app
+      MQTT_PASSWORD: ${APP_MQTT_PASSWORD}
       # Pages that may log in, change data and open the WebSocket (the app's
       # CSRF check). Required since the app has its own login.
       ALLOWED_ORIGINS: https://api.rmx.lt
-      RUST_LOG: info
+      LOG_LEVEL: info
       # Signed gateway images (<version>.bin), sent over MQTT. Empty would
       # mean the app does not answer firmware requests.
       FIRMWARE_DIR: /firmware
     volumes:
-      # Relative to this file: services/caddy/firmware/probe. Read-only.
+      # Relative to this file: services/app/firmware. Read-only.
       # The app runs as uid 65532, so those files must be world-readable.
-      - ../caddy/firmware/probe:/firmware:ro
-    # Same check as the image's HEALTHCHECK (GET /probe/health), but more
+      - ./firmware:/firmware:ro
+    # Same check as the image's HEALTHCHECK (GET /app/health), but more
     # often, so the deploy script sees "healthy" within seconds.
     healthcheck:
-      test: ["CMD", "/app/probe-server", "healthcheck"]
+      test: ["CMD", "/app/rmx-server", "healthcheck"]
       interval: 5s
       timeout: 5s
       retries: 3

@@ -40,9 +40,9 @@ pairs() { awk 'NF==2 {print "  " $1 ": " $2}' "$1" 2>/dev/null || true; }
 	echo "vault_mosquitto_users:"
 	pairs "$SERVICES/mosquitto/data/credentials.txt"
 	echo
-	echo "vault_probe_db_password: $(sed -n 's/^PROBE_DB_PASSWORD=//p' "$SERVICES/probe/.env" 2>/dev/null | head -1 | grep . || echo change-me)"
-	echo "vault_probe_app_users:"
-	awk '$1=="app-login" {print "  " $2 ": " $3}' "$SERVICES/probe/data/credentials.txt" 2>/dev/null || true
+	echo "vault_app_db_password: $(sed -n 's/^APP_DB_PASSWORD=//p' "$SERVICES/app/.env" 2>/dev/null | head -1 | grep . || echo change-me)"
+	echo "vault_app_users:"
+	awk '$1=="app-login" {print "  " $2 ": " $3}' "$SERVICES/app/data/credentials.txt" 2>/dev/null || true
 	echo
 	echo "# The public half of DEPLOY_SSH_KEY, from /home/deploy/.ssh/authorized_keys."
 	echo "vault_deploy_ssh_key: $(sed -n 's/^.*\(ssh-ed25519 [A-Za-z0-9+\/=]* [^ ]*\)$/\1/p' /home/deploy/.ssh/authorized_keys 2>/dev/null | head -1)"

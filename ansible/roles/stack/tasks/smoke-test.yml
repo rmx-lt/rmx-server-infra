@@ -27,8 +27,7 @@
   delay: 5
   changed_when: false
 
-- name: Probe health (only when it is running)
+- name: App health
   ansible.builtin.command: >
-    curl -fsS --noproxy '*' --resolve api.rmx.lt:443:127.0.0.1 https://api.rmx.lt/probe/health
-  when: probe == "on"
+    curl -fsS --noproxy '*' --resolve api.rmx.lt:443:127.0.0.1 https://api.rmx.lt/app/health
   changed_when: false

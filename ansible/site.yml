@@ -3,7 +3,6 @@
 #
 #   bootstrap.sh                 apply
 #   bootstrap.sh --check --diff  show what would change, change nothing
-#   bootstrap.sh -e probe=on     also start the probe and create its app logins
 - name: RMX-SERVER
   hosts: rmx-vps
   # A later failure must not drop a reload that an ACL or config change already

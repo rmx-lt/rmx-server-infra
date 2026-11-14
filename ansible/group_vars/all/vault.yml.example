@@ -5,7 +5,7 @@
 # export-vault.sh builds this file from a running server.
 
 # SSH host keys. Kept so the server keeps its identity after a rebuild: the
-# PC's known_hosts and the GitHub secret DEPLOY_KNOWN_HOSTS (probe auto-deploy)
+# PC's known_hosts and the GitHub secret DEPLOY_KNOWN_HOSTS (app auto-deploy)
 # pin the ed25519 key. Leave the list empty to get new keys on a fresh server.
 vault_ssh_host_keys:
   - type: ed25519
@@ -15,25 +15,24 @@ vault_ssh_host_keys:
       -----END OPENSSH PRIVATE KEY-----
     public: ssh-ed25519 AAAA... root@vps3124
 
-# Mosquitto password logins on 8883: user -> password. probe-app's password
-# is also the app's (probe/.env). Devices log in with a client certificate on
+# Mosquitto password logins on 8883: user -> password. The "app" password
+# is also the app's (app/.env). Devices log in with a client certificate on
 # 8884 and have no password (wiki Device-CA). mower-test is the login of the
 # ACL tests (services/mosquitto/tests/mqtt-tests.ps1). The playbook deletes
 # logins that are not in this list.
 vault_mosquitto_users:
   app: change-me
   mower-test: change-me
-  probe-app: change-me
 
 # rmx-server-app: database password (letters and digits only, it goes
-# into a URL) and the app's own logins.
-vault_probe_db_password: change-me
-vault_probe_app_users:
-  probe: change-me
+# into a URL) and the app's own web logins (login -> password).
+vault_app_db_password: change-me
+vault_app_users:
+  admin: change-me
 
 # Public key of the GitHub Actions deploy key (rmx-server-app secret
 # DEPLOY_SSH_KEY). It only gets the forced deploy command.
-vault_deploy_ssh_key: ssh-ed25519 AAAA... rmx-backend-probe-deploy
+vault_deploy_ssh_key: ssh-ed25519 AAAA... rmx-server-app-deploy
 
 # Optional: public key of the CI key (GitHub secret CI_SSH_KEY, deploy.yml).
 # Without it the ci user is not created and the server is deployed by hand.

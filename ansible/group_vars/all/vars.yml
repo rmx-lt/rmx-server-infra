@@ -45,9 +45,6 @@ services_dir: "{{ repo_dir }}/services"
 # Caddy gets this certificate; cert-sync copies it to Mosquitto.
 mqtt_domain: mqtt.rmx.lt
 
-# -e probe=on starts the probe and creates its app logins. Off by default
-# (wiki Server-Infra §10 "Probe"); a plain run leaves a running probe alone.
-probe: "off"
 # This repo on the machine that runs ansible (files are copied from here).
 repo_src: "{{ playbook_dir | dirname }}"
 # Image used to hash Mosquitto passwords (same as services/mosquitto/compose.yaml).

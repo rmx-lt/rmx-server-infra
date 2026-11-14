@@ -21,9 +21,8 @@ Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/rmx-vps/services
 ExecStart=/usr/bin/docker compose up -d --no-recreate
-# No --profile probe: the probe is switched on and off by hand (wiki
-# Server §10), so a stopped probe must stay stopped (#47). Its containers
-# rely on restart: unless-stopped.
+# The app and its database are part of the stack (no profile), so this starts
+# them after a boot too.
 TimeoutStartSec=300
 
 [Install]
