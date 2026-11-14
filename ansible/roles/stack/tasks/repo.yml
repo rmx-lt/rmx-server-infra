@@ -35,6 +35,16 @@
     state: absent
   loop: [/root, "/home/{{ admin_user }}"]
 
+# Fetch over HTTPS: the repo is public, so deploys (rmx-ci fetches origin)
+# never depend on the push key below. Only pushes use the key (pushurl).
+- name: Fetch over HTTPS
+  ansible.builtin.command: git -C {{ repo_dir }} config --local remote.origin.url {{ repo_url }}
+  args:
+    removes: "{{ repo_dir }}/.git"  # only in a clone (the container test copies the files)
+  become: true
+  become_user: "{{ admin_user }}"
+  changed_when: false
+
 # Optional push access from the server (wiki Server-Infra §9), with a deploy key that
 # can write to this repo only.
 - name: Push access from the server
@@ -73,7 +83,7 @@
     - name: Push over SSH with that key, and the commit identity
       ansible.builtin.command: git -C {{ repo_dir }} config --local {{ item.name }} {{ item.value }}
       loop:
-        - { name: remote.origin.url, value: "git@github-rmx-vps:rmx-lt/rmx-server-infra.git" }
+        - { name: remote.origin.pushurl, value: "git@github-rmx-vps:rmx-lt/rmx-server-infra.git" }
         - { name: user.name, value: jRmx0 }
         - { name: user.email, value: "116594512+jRmx0@users.noreply.github.com" }
       become: true
