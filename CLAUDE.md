@@ -16,7 +16,7 @@ Infrastructure of the Blade of Grass VPS: Ansible playbook, Docker Compose stack
 - sshd changes: back up first, run `sudo sshd -t` before reload/restart, keep the current session open, and test a **new** `ssh rmx-vps` login. For risky changes, schedule an auto-rollback (`systemd-run --on-active=5min …`) and cancel it after the test passes.
 - Never put a `Match` block in `sshd_config.d/`: those files are included at the top of the main file, so the `Match` would swallow the settings after it.
 - Docker bypasses ufw: databases publish no ports, private tools bind to `127.0.0.1`, public ports are deliberate and documented.
-- The app stays on: never stop `app`/`db` unless the owner asks. Never run `docker compose stop|down` without service names (it also stops Caddy and Mosquitto). The old probe data in `services/probe/data` is not deleted by the playbook; delete it only when the owner says so.
+- The app stays on: never stop `app`/`db` unless the owner asks. Never run `docker compose stop|down` without service names (it also stops Caddy and Mosquitto).
 - Run `docker compose` from `services/` (project `rmx`) and address services by service name, not container name.
 - Secrets (`credentials.txt`, vault, `.env` files on the server): read them into a variable over ssh, never print them in chat, logs or commits.
 - Commands that need a password or passphrase: give the user the exact command to run themselves.
