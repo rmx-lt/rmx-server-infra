@@ -4,7 +4,7 @@
 	servers {
 		protocols h1 h2
 	}
-	# Let's Encrypt only, no ZeroSSL fallback: the mower probe trusts only ISRG
+	# Let's Encrypt only, no ZeroSSL fallback: the mower gateway trusts only ISRG
 	# Root X1/X2 (rmx-mower-gateway certs/rmx-ca-bundle.pem). A certificate
 	# from another CA would cut it off, including from OTA fixes.
 	cert_issuer acme {
@@ -21,20 +21,20 @@ rmx.lt {
 
 # API: placeholder until the app container exists
 api.rmx.lt {
-	# rmx-server-app (Compose profile "probe"). The prefix is kept: the app
-	# serves /probe/... itself, including its own login: a session cookie
-	# checked by the app on the API, /probe/ws and /probe/config.json (wiki
-	# page Server-App, "Login and sessions"). Only /probe/health, login/logout and the
-	# static page (public code, no data) work without a session.
-	# Caddy adds no auth of its own any more (basic auth broke WebSockets on
-	# iPhones). Still closed by default: when the probe is off, probe-app
-	# doesn't resolve and Caddy answers 502, so nothing under /probe is open.
+	# rmx-server-app. The prefix is kept: the app serves /app/... itself,
+	# including its own login: a session cookie checked by the app on the
+	# API and /app/ws (wiki page Server-App, "Login and sessions"). Only
+	# /app/health, login/logout and the static page (public code, no data)
+	# work without a session.
+	# Caddy adds no auth of its own (basic auth broke WebSockets on
+	# iPhones). While the app is down, app doesn't resolve and Caddy answers
+	# 502, so nothing under /app is open.
 	# Caddy passes Cookie and Origin through and sets X-Forwarded-For to the
 	# real client IP (it ignores one sent by the client), which the app's
 	# login rate limit uses.
-	@probe path /probe /probe/*
-	handle @probe {
-		reverse_proxy probe-app:8080
+	@app path /app /app/*
+	handle @app {
+		reverse_proxy app:8080
 	}
 
 	handle {

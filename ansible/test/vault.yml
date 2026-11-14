@@ -4,10 +4,9 @@ vault_ssh_host_keys: []
 vault_mosquitto_users:
   app: test-only
   mower-test: test-only
-  probe-app: test-only
-vault_probe_db_password: testonly
-vault_probe_app_users:
-  probe: test-only
+vault_app_db_password: testonly
+vault_app_users:
+  admin: test-only
 vault_deploy_ssh_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMadeUpKeyForTestsOnlyMadeUpKeyForTestsOnly0 test
 vault_ci_ssh_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMadeUpKeyForTestsOnlyMadeUpKeyForTestsOnly1 test
 vault_github_deploy_key: ""

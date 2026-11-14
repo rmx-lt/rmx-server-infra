@@ -18,15 +18,12 @@ topic readwrite mower/#
 # so a new mower needs a login only, no change in this file.
 pattern readwrite mower/%u/#
 
-# Shared server topics every login may read (gateway link, wiki Mower-Gateway-
-# Server-Contract): change events and the server's retained online/offline.
-# "events" and "status" are therefore not usable as mower names.
-pattern read mower/events/#
+# Shared server topic every login may read (gateway link, wiki Mower-Gateway-
+# Server-Contract): the server's retained online/offline. "status" is
+# therefore not usable as a mower name.
 pattern read mower/status/server
 
-# --- rmx-server-app (see wiki Server-Infra §10 "Probe") ---------------------------
+# rmx-server-app (see wiki Server-Infra §10 "App") logs in as "app" (above).
 # Topics: mower/<client-id>/req (device -> server), mower/<client-id>/res
-# (server -> device), mower/events/records, mower/status/server (retained).
+# (server -> device), mower/status/server (retained).
 # The ESP32 gateway mower-01 logs in with its client certificate on 8884.
-user probe-app
-topic readwrite mower/#

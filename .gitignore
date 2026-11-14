@@ -29,7 +29,8 @@ desktop.ini
 # Docker services: secrets and runtime data stay on the server
 !.env.example
 services/*/data/
-# Caddy: OTA firmware images and their download logins
+# OTA firmware images (served over MQTT by the app)
+services/app/firmware/
 services/caddy/firmware/
 services/caddy/private/
 

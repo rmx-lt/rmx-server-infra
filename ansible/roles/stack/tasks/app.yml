@@ -1,0 +1,132 @@
+# The app's server-only files, its firmware folder and the deploy script
+# (wiki Server-Infra §10 "App"). The containers start with the rest of the
+# stack (main.yml); the old probe is removed by probe-cleanup.yml.
+
+- name: App data folder
+  ansible.builtin.file:
+    path: "{{ services_dir }}/app/data"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# The firmware images folder. The app serves it over MQTT (FIRMWARE_DIR).
+- name: App firmware folder
+  ansible.builtin.file:
+    path: "{{ services_dir }}/app/firmware"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0755"
+
+# The images used to live in caddy/firmware/probe. Move them once; when the
+# old folder is gone this does nothing. stat first so --check on a host that
+# has no old folder does not fail.
+- name: Old firmware folder
+  ansible.builtin.stat:
+    path: "{{ services_dir }}/caddy/firmware/probe"
+  register: old_firmware_dir
+
+- name: Old firmware images
+  ansible.builtin.find:
+    paths: "{{ services_dir }}/caddy/firmware/probe"
+    patterns: ["*.bin"]
+    file_type: file
+    follow: false
+  register: old_firmware_files
+  when: old_firmware_dir.stat.isdir | default(false)
+
+- name: Move the old firmware images to app/firmware
+  ansible.builtin.command:
+    argv: [mv, -n, "{{ item.path }}", "{{ services_dir }}/app/firmware/"]
+  loop: "{{ old_firmware_files.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  changed_when: true
+
+# rmdir only removes an empty folder; anything left in it stays and shows up
+# as "not empty" (not an error: the folder was not ours to delete).
+- name: Remove the empty old firmware folders
+  ansible.builtin.command:
+    argv: [rmdir, "{{ item }}"]
+  loop:
+    - "{{ services_dir }}/caddy/firmware/probe"
+    - "{{ services_dir }}/caddy/firmware"
+  register: old_firmware_rmdir
+  changed_when: old_firmware_rmdir.rc == 0
+  failed_when: false
+  when: old_firmware_dir.stat.isdir | default(false)
+
+# The app is uid 65532 and is not in the admin group. The folder stays 0755
+# (other can traverse). An scp upload can be owner-only; make the files
+# world-readable.
+- name: Firmware images
+  ansible.builtin.find:
+    paths: "{{ services_dir }}/app/firmware"
+    file_type: file
+    recurse: true
+    follow: false
+  register: app_firmware_files
+
+- name: Firmware images readable by the app
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    mode: "0644"
+  loop: "{{ app_firmware_files.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+
+# Created on the first run (image tag `production`, see the template); later runs
+# only keep the passwords in line. APP_TAG belongs to the deploy script.
+- name: App env file
+  ansible.builtin.template:
+    src: app.env.j2
+    dest: "{{ services_dir }}/app/.env"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0600"
+    force: false
+  no_log: true
+
+- name: Passwords in app/.env
+  ansible.builtin.lineinfile:
+    path: "{{ services_dir }}/app/.env"
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+  loop:
+    - { key: APP_DB_PASSWORD, value: "{{ vault_app_db_password }}" }
+    - { key: APP_MQTT_PASSWORD, value: "{{ vault_mosquitto_users['app'] }}" }
+  loop_control: { label: "{{ item.key }}" }
+  no_log: true
+
+- name: Plain-text copies of the app logins (for you)
+  ansible.builtin.copy:
+    dest: "{{ services_dir }}/app/data/credentials.txt"
+    content: |
+      db-password {{ vault_app_db_password }}
+      {% for user, password in vault_app_users.items() %}
+      app-login {{ user }} {{ password }}
+      {% endfor %}
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Deploy script
+  ansible.builtin.copy:
+    src: "{{ services_dir }}/app/deploy/rmx-deploy-app.sh"
+    remote_src: true
+    dest: /usr/local/sbin/rmx-deploy-app
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy log
+  ansible.builtin.file:
+    path: /var/log/rmx-deploy-app.log
+    state: touch
+    owner: root
+    group: adm
+    mode: "0640"
+    modification_time: preserve
+    access_time: preserve

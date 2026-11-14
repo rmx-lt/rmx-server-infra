@@ -1,6 +1,3 @@
-# The firmware images folder. probe-app serves it over MQTT (FIRMWARE_DIR);
-# Caddy no longer serves it (wiki Server-Infra §10 "Firmware images").
-
 - name: Caddy folders
   ansible.builtin.file:
     path: "{{ services_dir }}/caddy/{{ item.path }}"
@@ -9,35 +6,7 @@
     group: "{{ item.owner }}"
     mode: "{{ item.mode }}"
   loop:
-    - { path: firmware, owner: "{{ admin_user }}", mode: "0755" }
-    - { path: firmware/probe, owner: "{{ admin_user }}", mode: "0755" }
     - { path: private, owner: root, mode: "0700" }
-
-# probe-app is uid 65532 and is not in the admin group. The directories
-# above stay 0755 (other can traverse). An scp upload can be owner-only;
-# make the files world-readable. This does not touch caddy/private.
-# stat first so --check on a host that has no firmware dir yet does not fail.
-- name: Firmware directory
-  ansible.builtin.stat:
-    path: "{{ services_dir }}/caddy/firmware"
-  register: caddy_firmware_dir
-
-- name: Firmware images
-  ansible.builtin.find:
-    paths: "{{ services_dir }}/caddy/firmware"
-    file_type: file
-    recurse: true
-    follow: false
-  register: caddy_firmware_files
-  when: caddy_firmware_dir.stat.isdir | default(false)
-
-- name: Firmware images readable by probe-app
-  ansible.builtin.file:
-    path: "{{ item.path }}"
-    mode: "0644"
-  loop: "{{ caddy_firmware_files.files | default([]) }}"
-  loop_control:
-    label: "{{ item.path | basename }}"
 
 # /fw/ was removed (issue 79): firmware goes over MQTT. Delete its old logins.
 - name: Old /fw/ login files are gone

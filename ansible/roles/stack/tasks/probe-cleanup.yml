@@ -1,0 +1,29 @@
+# The old probe (issue 85): remove its containers and deploy script. Runs
+# before the stack starts, so Compose finds no orphans. Never
+# `docker compose down`: that would take Caddy and Mosquitto too. The old
+# database folder services/probe/data and /var/log/rmx-deploy-probe.log
+# (history) stay until deleted by hand.
+
+- name: Old probe containers
+  ansible.builtin.command: >
+    docker ps -aq --filter label=com.docker.compose.project=rmx
+    --filter label=com.docker.compose.service={{ item }}
+  loop: [probe-app, probe-db]
+  register: old_probe_containers
+  changed_when: false
+  check_mode: false
+
+- name: Stop and remove the old probe containers
+  ansible.builtin.command: docker rm -f {{ item.stdout_lines | join(' ') }}
+  loop: "{{ old_probe_containers.results }}"
+  loop_control: { label: "{{ item.item }}" }
+  changed_when: true
+  when: item.stdout_lines | length > 0
+
+- name: Old probe deploy script and lock are gone
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /usr/local/sbin/rmx-deploy-probe
+    - /run/lock/rmx-deploy-probe.lock
