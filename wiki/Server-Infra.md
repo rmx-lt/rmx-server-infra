@@ -228,7 +228,8 @@ The server clone can also **push**, using a repo-only deploy key (see below). Pu
 
 - Deploy key `/home/rmx/.ssh/github-rmx-vps` (ed25519, no passphrase), added to this repo with **write access**. It works for this repo only, not the rest of the GitHub account.
 - The playbook sets the remote of `/opt/rmx-vps` on every run (`roles/stack/tasks/repo.yml`), so a repo rename means changing that URL too.
-- `~rmx/.ssh/config` has `Host github-rmx-vps` → `github.com` with that key; the remote is `git@github-rmx-vps:rmx-lt/rmx-server-infra.git`.
+- `~rmx/.ssh/config` has `Host github-rmx-vps` → `github.com` with that key. The remote fetches over HTTPS (`https://github.com/rmx-lt/rmx-server-infra.git`, public, no key) and pushes to `git@github-rmx-vps:rmx-lt/rmx-server-infra.git` (`remote.origin.pushurl`), so deploys never depend on the key.
+- The organization has deploy keys turned off: the key stored in the vault (replaced 2026-11-14) is not registered on GitHub, so pushing from the server doesn't work until an org admin allows deploy keys and adds its public half.
 - Commit identity (repo-local): `jRmx0 <116594512+jRmx0@users.noreply.github.com>`.
 - Always work as `rmx` (root has no access to the key):
 
