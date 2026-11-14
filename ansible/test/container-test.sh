@@ -48,6 +48,34 @@ ct 'd=/opt/rmx-vps/services/caddy/data/data/caddy/certificates/test/mqtt.rmx.lt 
 
 play() { ct "cd /opt/rmx-vps/ansible && ansible-playbook site.yml --skip-tags smoke $*"; }
 
+# The real image may not exist yet (or the runner has no registry access), so the
+# test gives Compose a local stand-in under the same name: Compose pulls only
+# an image that is missing. The stub answers `healthcheck` and remembers
+# `create-user` names like the app (a second create of the same name fails).
+# Docker comes from the playbook, so install that part first.
+echo "== docker role first (for the app stand-in image)"
+play --tags docker >"$LOG" 2>&1 || { tail -40 "$LOG"; exit 1; }
+docker exec -i "$NAME" bash -c 'mkdir -p /tmp/stub && cat >/tmp/stub/rmx-server' <<'STUB'
+#!/bin/sh
+case "$1" in
+healthcheck) exit 0 ;;
+create-user)
+	grep -qx "$2" /tmp/users 2>/dev/null && exit 1
+	cat >/dev/null
+	echo "$2" >>/tmp/users
+	exit 0
+	;;
+esac
+exit 1
+STUB
+docker exec -i "$NAME" bash -c 'cat >/tmp/stub/Dockerfile' <<'STUB'
+FROM busybox:1.37
+COPY rmx-server /app/rmx-server
+RUN chmod +x /app/rmx-server
+CMD ["sleep", "infinity"]
+STUB
+ct 'docker build -q -t ghcr.io/rmx-lt/rmx-server-app:production /tmp/stub >/dev/null'
+
 echo "== run 1: from empty"
 if ! play >"$LOG" 2>&1; then
 	grep -B1 -A14 -E '^(fatal|failed):' "$LOG" | head -80 || true
