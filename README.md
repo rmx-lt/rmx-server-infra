@@ -1,6 +1,6 @@
 # rmx-server-infra
 
-Infrastructure of **RMX-SERVER**, the Blade of Grass VPS (`45.81.252.43`, Ubuntu 24.04): a hardened host running a Docker Compose stack with Caddy (HTTPS for `rmx.lt`, `api.rmx.lt`), Mosquitto (MQTT over TLS on `mqtt.rmx.lt:8883`) and rmx-server-app (the server) with its database.
+Infrastructure of **RMX-SERVER**, the Blade of Grass VPS (`45.81.252.43`, Ubuntu 24.04): a hardened host running a Docker Compose stack with Caddy (HTTPS for `rmx.lt` with the app under `/app/`, and `api.rmx.lt`), Mosquitto (MQTT over TLS on `mqtt.rmx.lt:8883`) and rmx-server-app (the server) with its database.
 
 - **Docs:** the wiki pages [Server-Infra](https://github.com/rmx-lt/blade-of-grass/wiki/Server-Infra) (access, hardening, services, ports, app deploy) and [Server-Infra-Ansible](https://github.com/rmx-lt/blade-of-grass/wiki/Server-Infra-Ansible) (setup as code, CI/CD). They live in this repo's [`wiki/`](wiki) folder and change by PR; rules: [Wiki-Policy](https://github.com/rmx-lt/blade-of-grass/blob/development/wiki/Wiki-Policy.md). Code comments cite them as "wiki Server-Infra §N".
 - **Work:** issues on the [Blade of Grass project](https://github.com/orgs/rmx-lt/projects/1).

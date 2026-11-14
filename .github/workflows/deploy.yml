@@ -79,5 +79,6 @@ jobs:
         run: |
           curl -fsS --retry 6 --retry-delay 5 -o /dev/null https://rmx.lt/
           curl -fsS --retry 6 --retry-delay 5 -o /dev/null https://api.rmx.lt/
-          curl -fsS --retry 6 --retry-delay 5 https://api.rmx.lt/app/health | grep -q '"status":"ok"'
+          test "$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' https://api.rmx.lt/app/)" = '308 https://rmx.lt/app/'
+          curl -fsS --retry 6 --retry-delay 5 https://rmx.lt/app/health | grep -q '"status":"ok"'
           echo | openssl s_client -connect mqtt.rmx.lt:8883 -servername mqtt.rmx.lt -verify_return_error -brief 2>&1 | grep -q 'Verification: OK'

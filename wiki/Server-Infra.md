@@ -321,14 +321,14 @@ services/
 | 8883/tcp | Mosquitto | ✅ | MQTT over TLS (`mqtt.rmx.lt`), password login |
 | 8884/tcp | Mosquitto | ✅ | MQTT over TLS (`mqtt.rmx.lt`), device client certificate |
 
-Not public (reachable only by containers on `rmx_edge`): Mosquitto's plain MQTT **1883** (`mosquitto:1883`, the app); the app's **8080** (only via Caddy at `https://api.rmx.lt/app/`). The database's 5432 is on `rmx_backend` only.
+Not public (reachable only by containers on `rmx_edge`): Mosquitto's plain MQTT **1883** (`mosquitto:1883`, the app); the app's **8080** (only via Caddy at `https://rmx.lt/app/`). The database's 5432 is on `rmx_backend` only.
 
 ### Caddy
 
 - Image `caddy:2.11` (2.11.7 when installed); container `rmx-caddy-1`.
 - Sites:
   - `https://rmx.lt`: static placeholder page from `site/`
-  - `https://api.rmx.lt`: placeholder JSON `{"service":"rmx-api","status":"placeholder"}`, except `/app` and `/app/*` → app:8080 (prefix kept). The app does its own login (see [App](#app-rmx-server-app)); Caddy adds no auth. While the app is down, `/app/*` answers 502
+  - `https://api.rmx.lt`: placeholder JSON `{"service":"rmx-api","status":"placeholder"}`; `/app` and `/app/*` redirect (308) to `https://rmx.lt/app/…` (the app's old address until 2026-11-14)
   - `https://www.rmx.lt/…` → **301** to `https://rmx.lt/…`
   - `https://mqtt.rmx.lt`: a one-line text. The block exists so that Caddy obtains and renews the certificate Mosquitto uses (see [Mosquitto](#mosquitto-mqtt)). No MQTT goes through Caddy
   - every `http://…` → **308** to `https://…`
@@ -462,7 +462,7 @@ Check the certificates from the PC: `curl.exe -vI https://rmx.lt` (Windows curl 
 | Container | Image | Networks | Memory | Notes |
 |---|---|---|---|---|
 | `db` | `timescale/timescaledb:2.30.2-pg17` | `rmx_backend` | `mem_limit 256m` (~60 MB used) | No ports. User and database `app`. Tuned small: `shared_buffers=32MB`, `work_mem=2MB`, `max_connections=20`, no parallel workers, `timescaledb.max_background_workers=3`, `timescaledb.telemetry_level=off`. Data in `app/data/db/` |
-| `app` | `ghcr.io/rmx-lt/rmx-server-app:${APP_TAG}` | `rmx_edge` + `rmx_backend` | `mem_limit 64m` | No ports; Caddy proxies to `app:8080`. Health check every 5 s (`/app/rmx-server healthcheck`, i.e. `GET /app/health`). A static Go binary on `distroless/static`, `GOMEMLIMIT=40MiB` inside the 64 MB limit. Environment: `DATABASE_URL`, `MQTT_HOST=mosquitto`, `MQTT_PORT=1883`, `MQTT_USERNAME=app`, `MQTT_PASSWORD`, `ALLOWED_ORIGINS=https://api.rmx.lt`, `LOG_LEVEL=info`, `FIRMWARE_DIR=/firmware` |
+| `app` | `ghcr.io/rmx-lt/rmx-server-app:${APP_TAG}` | `rmx_edge` + `rmx_backend` | `mem_limit 64m` | No ports; Caddy proxies to `app:8080`. Health check every 5 s (`/app/rmx-server healthcheck`, i.e. `GET /app/health`). A static Go binary on `distroless/static`, `GOMEMLIMIT=40MiB` inside the 64 MB limit. Environment: `DATABASE_URL`, `MQTT_HOST=mosquitto`, `MQTT_PORT=1883`, `MQTT_USERNAME=app`, `MQTT_PASSWORD`, `ALLOWED_ORIGINS=https://rmx.lt`, `LOG_LEVEL=info`, `FIRMWARE_DIR=/firmware` |
 
 > **The app and its database are always on.** Do not stop `app` or `db` unless the owner asks. The old probe's database in `services/probe/data` is no longer used or backed up as a database; it was deleted on 2026-11-14.
 
@@ -481,12 +481,12 @@ Vault variables: `vault_app_db_password` (letters and digits only: it goes into 
 
 | URL | Goes to | Login |
 |---|---|---|
-| `https://api.rmx.lt/app/` | app: the page with its login form (public), `/app/api/…`, `/app/ws` | The app's own login (session cookie) |
-| `https://api.rmx.lt/app/health` | app health JSON (200 / 503) | None (only up/down and the version) |
+| `https://rmx.lt/app/` | app: the page with its login form (public), `/app/api/…`, `/app/ws` | The app's own login (session cookie) |
+| `https://rmx.lt/app/health` | app health JSON (200 / 503) | None (only up/down and the version) |
 | `mqtts://mqtt.rmx.lt:8883` | Mosquitto (password logins: `mower-test`; `app` uses plain 1883 inside Docker) | Password |
 | `mqtts://mqtt.rmx.lt:8884` | Mosquitto (device client certificates) | Certificate CN, no password |
 
-**Login:** the app has its own login page and server-side sessions. After login the browser holds an `HttpOnly`, `Secure`, `SameSite=Strict` cookie (`__Secure-app_session`, `Path=/app`); the app checks it on every API request and on the WebSocket handshake. Requests that change something and WebSocket handshakes must come from `https://api.rmx.lt` (`ALLOWED_ORIGINS` in `app/compose.yaml`), and failed logins slow down (per username and IP). Why each choice: [Server-App → Login and sessions](Server-App#login-and-sessions).
+**Login:** the app has its own login page and server-side sessions. After login the browser holds an `HttpOnly`, `Secure`, `SameSite=Strict` cookie (`__Secure-app_session`, `Path=/app`); the app checks it on every API request and on the WebSocket handshake. Requests that change something and WebSocket handshakes must come from `https://rmx.lt` (`ALLOWED_ORIGINS` in `app/compose.yaml`), and failed logins slow down (per username and IP). Why each choice: [Server-App → Login and sessions](Server-App#login-and-sessions).
 
 **Users** (no sign-up page). The playbook creates every login in `vault_app_users` after `app` is healthy (`create-user`, password on stdin; a login that exists is left alone, so changing a password in the vault does not change the app's). By hand, on the server in `/opt/rmx-vps/services`; the password is piped in from stdin, so it never appears on a command line:
 

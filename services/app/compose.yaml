@@ -74,7 +74,7 @@ services:
       MQTT_PASSWORD: ${APP_MQTT_PASSWORD}
       # Pages that may log in, change data and open the WebSocket (the app's
       # CSRF check). Required since the app has its own login.
-      ALLOWED_ORIGINS: https://api.rmx.lt
+      ALLOWED_ORIGINS: https://rmx.lt
       LOG_LEVEL: info
       # Signed gateway images (<version>.bin), sent over MQTT. Empty would
       # mean the app does not answer firmware requests.
