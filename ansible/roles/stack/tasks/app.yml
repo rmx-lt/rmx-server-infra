@@ -2,6 +2,19 @@
 # (wiki Server-Infra §10 "App"). The containers start with the rest of the
 # stack (main.yml); the old probe is removed by probe-cleanup.yml.
 
+# On the first deploy, --check can't preview steps that write into files and
+# folders this role creates (they don't exist yet in check mode). Remember
+# whether they existed before, and skip those steps in check mode if not.
+- name: App folder before this run
+  ansible.builtin.stat:
+    path: "{{ services_dir }}/app/data"
+  register: app_data_before
+
+- name: App env file before this run
+  ansible.builtin.stat:
+    path: "{{ services_dir }}/app/.env"
+  register: app_env_before
+
 - name: App data folder
   ansible.builtin.file:
     path: "{{ services_dir }}/app/data"
@@ -67,6 +80,7 @@
     recurse: true
     follow: false
   register: app_firmware_files
+  when: not ansible_check_mode or app_data_before.stat.exists
 
 - name: Firmware images readable by the app
   ansible.builtin.file:
@@ -98,6 +112,7 @@
     - { key: APP_MQTT_PASSWORD, value: "{{ vault_mosquitto_users['app'] }}" }
   loop_control: { label: "{{ item.key }}" }
   no_log: true
+  when: not ansible_check_mode or app_env_before.stat.exists
 
 - name: Plain-text copies of the app logins (for you)
   ansible.builtin.copy:
@@ -111,6 +126,7 @@
     group: root
     mode: "0600"
   no_log: true
+  when: not ansible_check_mode or app_data_before.stat.exists
 
 - name: Deploy script
   ansible.builtin.copy:
