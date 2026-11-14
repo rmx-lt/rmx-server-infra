@@ -52,9 +52,9 @@ play() { ct "cd /opt/rmx-vps/ansible && ansible-playbook site.yml --skip-tags sm
 # test gives Compose a local stand-in under the same name: Compose pulls only
 # an image that is missing. The stub answers `healthcheck` and remembers
 # `create-user` names like the app (a second create of the same name fails).
-# Docker comes from the playbook, so install that part first.
+# Docker comes from the playbook, so install that part first (base brings gpg).
 echo "== docker role first (for the app stand-in image)"
-play --tags docker >"$LOG" 2>&1 || { tail -40 "$LOG"; exit 1; }
+play --tags base,docker >"$LOG" 2>&1 || { tail -40 "$LOG"; exit 1; }
 docker exec -i "$NAME" bash -c 'mkdir -p /tmp/stub && cat >/tmp/stub/rmx-server' <<'STUB'
 #!/bin/sh
 case "$1" in
