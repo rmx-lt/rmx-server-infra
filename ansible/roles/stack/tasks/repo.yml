@@ -39,6 +39,8 @@
 # never depend on the push key below. Only pushes use the key (pushurl).
 - name: Fetch over HTTPS
   ansible.builtin.command: git -C {{ repo_dir }} config --local remote.origin.url {{ repo_url }}
+  args:
+    removes: "{{ repo_dir }}/.git"  # only in a clone (the container test copies the files)
   become: true
   become_user: "{{ admin_user }}"
   changed_when: false
