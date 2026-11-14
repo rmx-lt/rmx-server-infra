@@ -12,20 +12,13 @@
 	}
 }
 
-# Main site: placeholder page
+# Main site: placeholder page, and rmx-server-app under /app
 rmx.lt {
-	root * /srv/site
-	file_server
-	encode zstd gzip
-}
-
-# API: placeholder until the app container exists
-api.rmx.lt {
 	# rmx-server-app. The prefix is kept: the app serves /app/... itself,
-	# including its own login: a session cookie checked by the app on the
-	# API and /app/ws (wiki page Server-App, "Login and sessions"). Only
-	# /app/health, login/logout and the static page (public code, no data)
-	# work without a session.
+	# including its own login: a session cookie (Path=/app) checked by the
+	# app on the API and /app/ws (wiki page Server-App, "Login and
+	# sessions"). Only /app/health, login/logout and the static page (public
+	# code, no data) work without a session.
 	# Caddy adds no auth of its own (basic auth broke WebSockets on
 	# iPhones). While the app is down, app doesn't resolve and Caddy answers
 	# 502, so nothing under /app is open.
@@ -35,6 +28,21 @@ api.rmx.lt {
 	@app path /app /app/*
 	handle @app {
 		reverse_proxy app:8080
+	}
+
+	handle {
+		root * /srv/site
+		file_server
+		encode zstd gzip
+	}
+}
+
+# API: placeholder. The app moved to https://rmx.lt/app/ (issue 97);
+# old links under /app redirect there.
+api.rmx.lt {
+	@app path /app /app/*
+	handle @app {
+		redir https://rmx.lt{uri} 308
 	}
 
 	handle {
