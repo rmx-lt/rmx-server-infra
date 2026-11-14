@@ -27,7 +27,14 @@
   delay: 5
   changed_when: false
 
+# Check the body, not only the status: a stale Caddy config answered /app/health
+# with its 200 placeholder (issue 93).
 - name: App health
   ansible.builtin.command: >
     curl -fsS --noproxy '*' --resolve api.rmx.lt:443:127.0.0.1 https://api.rmx.lt/app/health
+  register: smoke_app
+  until: smoke_app.stdout is search('"status":"ok"')
+  retries: 12
+  delay: 5
   changed_when: false
+  failed_when: smoke_app.stdout is not search('"status":"ok"')
