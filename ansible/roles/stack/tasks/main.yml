@@ -24,6 +24,45 @@
   changed_when: caddy_up.stderr is search('Created|Recreated|Started')
   when: not ansible_check_mode
 
+# The Caddyfile is a single-file bind mount and rmx-ci updates the repo with
+# git, which replaces the file: the running container keeps reading the old
+# one, and `caddy reload` reloads that old file too (issue 93). Compare what
+# the container sees with the repo's file and restart when they differ, after
+# validating the new file in a throwaway container.
+- name: Caddyfile the running Caddy reads
+  ansible.builtin.command: docker compose exec -T caddy sha256sum /etc/caddy/Caddyfile
+  args: { chdir: "{{ services_dir }}" }
+  register: caddyfile_loaded
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Caddyfile in the repo
+  ansible.builtin.stat:
+    path: "{{ services_dir }}/caddy/Caddyfile"
+    checksum_algorithm: sha256
+  register: caddyfile_repo
+
+- name: Caddy runs a stale Caddyfile
+  ansible.builtin.set_fact:
+    caddyfile_stale: >-
+      {{ caddyfile_loaded.rc == 0 and caddyfile_repo.stat.exists
+         and caddyfile_loaded.stdout.split()[0] != caddyfile_repo.stat.checksum }}
+
+- name: Validate the new Caddyfile
+  ansible.builtin.command: >
+    docker compose run --rm --no-deps -T caddy
+    caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+  args: { chdir: "{{ services_dir }}" }
+  changed_when: false
+  when: caddyfile_stale | bool and not ansible_check_mode
+
+- name: Restart Caddy on the new Caddyfile
+  ansible.builtin.command: docker compose restart caddy
+  args: { chdir: "{{ services_dir }}" }
+  changed_when: true
+  when: caddyfile_stale | bool and not ansible_check_mode
+
 - name: Certificate for Mosquitto
   ansible.builtin.import_tasks: mqtt-cert.yml
 

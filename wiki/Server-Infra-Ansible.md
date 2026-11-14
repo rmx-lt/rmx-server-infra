@@ -39,7 +39,7 @@ Template with every field: [`group_vars/all/vault.yml.example`](https://github.c
 
    It installs git and Ansible, clones this repo to `/opt/rmx-vps`, asks for the vault password and runs the playbook on the server itself. About 10 minutes.
    If it stops with "Could not get lock /var/lib/dpkg/lock-frontend", the fresh image is still running its first-boot update. Wait until `pgrep -x apt-get` prints nothing, then run the line again. The package step prints nothing for a few minutes: don't interrupt it.
-3. Check: the smoke test at the end of the run answers for the sites and MQTT's TLS port (passing tasks are not printed; look for `failed=0`). Then `ssh rmx-vps` from the PC (the host key is the same as before, so no warning). Until the playbook has run, the fresh image has its own host key: don't `ssh-keygen -R`, just wait.
+3. Check: the smoke test at the end of the run answers for the sites, `/app/health` and MQTT's TLS port (passing tasks are not printed; look for `failed=0`). Then `ssh rmx-vps` from the PC (the host key is the same as before, so no warning). Until the playbook has run, the fresh image has its own host key: don't `ssh-keygen -R`, just wait.
 4. The app and its database start with the stack, and the logins in `vault_app_users` are created once `app` is healthy (no extra step).
 5. Get the data back (app database, Mosquitto store, firmware images, app tag). On the PC, download the newest `rmx-backup-<sha>` artifact of the `deploy` workflow (`gh run download <run-id> -R rmx-lt/rmx-server-infra`), decrypt it with `age -d -i age.key -o backup.tar.gz <file>` (in PowerShell never `>`: it corrupts binary files), then:
 
@@ -100,7 +100,7 @@ Feature branches are named `feat/<issue#>-slug`, and are deleted when their PR i
 - Remove things you delete from the playbook. A deleted task leaves its result on the server; add an explicit `state: absent` first, or reinstall.
 - Passwords of existing Mosquitto logins: it adds missing logins only (salted hashes can't be compared). To change one, edit the vault and run with `-e reset_mqtt_passwords=true`.
 - App: the database password only takes effect when the database is first created; a login in `vault_app_users` is created when it doesn't exist yet and never changed (use `set-password`, see [Server-Infra](Server-Infra) §10).
-- The old probe's data: the play removes the probe containers, its deploy script and lock, but not `services/probe/data` (the old database) or `/var/log/rmx-deploy-probe.log`; delete those by hand when the owner OKs it.
+- The old probe's data: the play removes the probe containers, its deploy script and lock, but not `/var/log/rmx-deploy-probe.log` (history). The old database `services/probe` was deleted by hand on 2026-11-14.
 
 ## Test it without risk
 

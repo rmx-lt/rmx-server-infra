@@ -400,7 +400,7 @@ The mower then connects to `mqtt.rmx.lt:8883` with TLS, username `mower-02` and 
 - Remove a login: `docker compose exec -u mosquitto mosquitto mosquitto_passwd -D /mosquitto/auth/passwd mower-02`, then the HUP, then delete its line in `credentials.txt`. A client that is already connected stays connected until it reconnects (or `docker compose restart mosquitto`).
 - A changed `config/acl` or `config/mosquitto.conf`, and a new or reset login, makes the playbook send `docker compose kill -s HUP mosquitto` after the container is up. The ACL task installs `config/acl` to `data/auth/acl` (owner 1883, mode `0600`) and notifies that reload. `mosquitto.conf` is watched by a checksum stamp at `data/.mosquitto.conf.sha1`. SIGHUP reloads logins, the ACL, `mosquitto.conf` and the certificate, and it does not disconnect clients. The play fails if the broker is running but its log has no `Reloading config.` line. The reload still runs when a later task fails. A stopped broker reads the files the next time it starts.
 - By hand, after `git pull`: `sudo install -o 1883 -g 1883 -m 0600 mosquitto/config/acl mosquitto/data/auth/acl && docker compose kill -s HUP mosquitto`. Mosquitto reads a copy of the ACL because it warns about ACL files that are world-readable or not owned by its user, and future versions will refuse them.
-- `services/mosquitto/config/` is mounted as a directory (`./config:/mosquitto/config:ro`), so a replaced `mosquitto.conf` is the file the process opens on SIGHUP. The Caddyfile is still a single-file mount and needs `docker compose restart caddy`.
+- `services/mosquitto/config/` is mounted as a directory (`./config:/mosquitto/config:ro`), so a replaced `mosquitto.conf` is the file the process opens on SIGHUP. The Caddyfile is still a single-file mount: git replaces the file, the container keeps reading the old one, and `caddy reload` reloads that old one too. The playbook compares the container's Caddyfile with the repo's after starting Caddy; when they differ it validates the new file in a throwaway container (`docker compose run --rm --no-deps caddy caddy validate …`) and runs `docker compose restart caddy`. By hand: `docker compose restart caddy`.
 
 **How the certificate gets to Mosquitto (and survives renewals)**
 
@@ -464,7 +464,7 @@ Check the certificates from the PC: `curl.exe -vI https://rmx.lt` (Windows curl 
 | `db` | `timescale/timescaledb:2.30.2-pg17` | `rmx_backend` | `mem_limit 256m` (~60 MB used) | No ports. User and database `app`. Tuned small: `shared_buffers=32MB`, `work_mem=2MB`, `max_connections=20`, no parallel workers, `timescaledb.max_background_workers=3`, `timescaledb.telemetry_level=off`. Data in `app/data/db/` |
 | `app` | `ghcr.io/rmx-lt/rmx-server-app:${APP_TAG}` | `rmx_edge` + `rmx_backend` | `mem_limit 64m` | No ports; Caddy proxies to `app:8080`. Health check every 5 s (`/app/rmx-server healthcheck`, i.e. `GET /app/health`). A static Go binary on `distroless/static`, `GOMEMLIMIT=40MiB` inside the 64 MB limit. Environment: `DATABASE_URL`, `MQTT_HOST=mosquitto`, `MQTT_PORT=1883`, `MQTT_USERNAME=app`, `MQTT_PASSWORD`, `ALLOWED_ORIGINS=https://api.rmx.lt`, `LOG_LEVEL=info`, `FIRMWARE_DIR=/firmware` |
 
-> **The app and its database are always on.** Do not stop `app` or `db` unless the owner asks. The old probe's database in `services/probe/data` is no longer used or backed up as a database; it stays on disk until the owner deletes it by hand (`sudo rm -rf /opt/rmx-vps/services/probe`).
+> **The app and its database are always on.** Do not stop `app` or `db` unless the owner asks. The old probe's database in `services/probe/data` is no longer used or backed up as a database; it was deleted on 2026-11-14.
 
 **Where the values come from** (all server only, gitignored). Compose reads `app/.env` automatically for the included `app/compose.yaml`, because it sits next to it. If it is missing, only `app` and `db` fail, and the rest of the stack keeps working. That's also why the compose files use no `${VAR:?}` checks.
 
@@ -514,7 +514,7 @@ docker compose stop app db            # only when the owner asks; name the servi
 
 ⚠️ Don't use `docker compose stop` or `down` without service names: that stops Caddy and Mosquitto too.
 
-**Cleanup of the old probe.** Every play removes the old `probe-app` and `probe-db` containers (found by their Compose labels, project `rmx`), `/usr/local/sbin/rmx-deploy-probe` and its lock file. It never runs `docker compose down`. History that stays: `/var/log/rmx-deploy-probe.log`, and the old database folder `services/probe/data` (the playbook does not delete it; the owner removes it by hand when OK).
+**Cleanup of the old probe.** Every play removes the old `probe-app` and `probe-db` containers (found by their Compose labels, project `rmx`), `/usr/local/sbin/rmx-deploy-probe` and its lock file. It never runs `docker compose down`. History that stays: `/var/log/rmx-deploy-probe.log`. The old database folder `services/probe` was deleted by hand on 2026-11-14.
 
 #### Auto-deploy (CD)
 
