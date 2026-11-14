@@ -50,6 +50,7 @@ play() { ct "cd /opt/rmx-vps/ansible && ansible-playbook site.yml --skip-tags sm
 
 echo "== run 1: from empty"
 if ! play >"$LOG" 2>&1; then
+	grep -B1 -A14 -E '^(fatal|failed):' "$LOG" | head -80 || true
 	tail -40 "$LOG"
 	echo "== diagnostics" >&2
 	ct 'docker run --rm --network none -v /tmp:/x --user 1883 eclipse-mosquitto:2.1-alpine id; journalctl -u docker -n 20 --no-pager' 2>&1 | tail -30 || true
