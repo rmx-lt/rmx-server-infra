@@ -13,8 +13,8 @@ set -euo pipefail
 REPO=${RMX_REPO:-/opt/rmx-vps}
 ADMIN=${RMX_ADMIN:-rmx}
 BRANCH=production
-DB_NAME=probe
-DB_USER=probe
+DB_NAME=app
+DB_USER=app
 
 log() { echo "rmx-ci: $*" >&2; }
 die() { log "$*"; exit 1; }
@@ -26,22 +26,22 @@ mk_tmp() {
 }
 
 # Services are addressed through Compose (by service name), never by
-# container name (#41). --profile probe: the probe services are visible too.
-compose() { docker compose -f "$REPO/services/compose.yaml" --profile probe "$@"; }
+# container name (#41).
+compose() { docker compose -f "$REPO/services/compose.yaml" "$@"; }
 running() { [[ -n $(compose ps -q --status running "$1" 2>/dev/null) ]]; }
 
 backup() {
 	mk_tmp
-	if running probe-db; then
-		compose exec -T probe-db pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc >"$TMP/probe.dump"
-		log "database dumped ($(stat -c %s "$TMP/probe.dump") bytes)"
+	if running db; then
+		compose exec -T db pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc >"$TMP/app.dump"
+		log "database dumped ($(stat -c %s "$TMP/app.dump") bytes)"
 	else
-		log "probe-db is not running: no database dump"
+		log "db is not running: no database dump"
 	fi
 	# The raw database folder is skipped (a dump of a live one is not
 	# consistent); .git comes back with the next clone.
 	local rc=0 repo=${REPO#/}
-	tar -czf - --exclude="$repo/.git" --exclude="$repo/services/probe/data/db" \
+	tar -czf - --exclude="$repo/.git" --exclude="$repo/services/app/data/db" \
 		-C / etc "$repo" -C "$TMP" . || rc=$?
 	((rc <= 1)) || die "tar failed ($rc)" # 1 = a file changed while reading
 }
@@ -51,45 +51,45 @@ restore() {
 	[[ -f $file ]] || die "usage: rmx-ci restore BACKUP.tar.gz"
 	mk_tmp
 	local rel=${REPO#/}
-	tar -xzf "$file" -C "$TMP" ./probe.dump "$rel/services/mosquitto/data/store" \
-		"$rel/services/caddy/firmware" "$rel/services/probe/.env" 2>/dev/null || true
+	tar -xzf "$file" -C "$TMP" ./app.dump "$rel/services/mosquitto/data/store" \
+		"$rel/services/app/firmware" "$rel/services/app/.env" 2>/dev/null || true
 
-	if [[ -f $TMP/probe.dump ]]; then
-		running probe-db || die "probe-db is not running (start the probe: ./bootstrap.sh -e probe=on)"
-		local app_was_up=false psql=(compose exec -T probe-db psql -U "$DB_USER" -v ON_ERROR_STOP=1 -q)
-		if running probe-app; then
+	if [[ -f $TMP/app.dump ]]; then
+		running db || die "db is not running (start it: docker compose up -d db)"
+		local app_was_up=false psql=(compose exec -T db psql -U "$DB_USER" -v ON_ERROR_STOP=1 -q)
+		if running app; then
 			app_was_up=true
-			compose stop probe-app 2>/dev/null
+			compose stop app 2>/dev/null
 		fi
 		# A fresh database: the timescaledb restore procedure needs one.
 		"${psql[@]}" -d postgres -c "DROP DATABASE IF EXISTS $DB_NAME WITH (FORCE)" -c "CREATE DATABASE $DB_NAME"
 		"${psql[@]}" -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS timescaledb" -c "SELECT timescaledb_pre_restore()"
-		compose exec -T probe-db pg_restore -U "$DB_USER" -d "$DB_NAME" --no-owner <"$TMP/probe.dump"
+		compose exec -T db pg_restore -U "$DB_USER" -d "$DB_NAME" --no-owner <"$TMP/app.dump"
 		"${psql[@]}" -d "$DB_NAME" -c "SELECT timescaledb_post_restore()"
-		if $app_was_up; then compose start probe-app 2>/dev/null; fi
+		if $app_was_up; then compose start app 2>/dev/null; fi
 		log "database restored"
 	else
 		log "no database dump in this backup"
 	fi
 
-	# OTA images served by Caddy: owned by the admin user, read-only for Caddy.
-	local fw=$TMP/$rel/services/caddy/firmware
+	# OTA images the app serves over MQTT: owned by the admin user, read-only for the app.
+	local fw=$TMP/$rel/services/app/firmware
 	if [[ -d $fw ]]; then
-		mkdir -p "$REPO/services/caddy/firmware"
-		cp -a "$fw/." "$REPO/services/caddy/firmware/"
-		chown -R "$ADMIN:$ADMIN" "$REPO/services/caddy/firmware"
+		mkdir -p "$REPO/services/app/firmware"
+		cp -a "$fw/." "$REPO/services/app/firmware/"
+		chown -R "$ADMIN:$ADMIN" "$REPO/services/app/firmware"
 		log "firmware images restored"
 	fi
 
-	# The probe image that was deployed, not the (possibly older) one in the vault.
+	# The app image that was deployed, not the (possibly older) one in the vault.
 	local tag
-	tag=$(sed -n 's/^PROBE_TAG=//p' "$TMP/$rel/services/probe/.env" 2>/dev/null | head -n1 || true)
+	tag=$(sed -n 's/^APP_TAG=//p' "$TMP/$rel/services/app/.env" 2>/dev/null | head -n1 || true)
 	if [[ $tag =~ ^sha-[0-9a-f]{7}$ ]]; then
-		if running probe-app; then
-			/usr/local/sbin/rmx-deploy-probe "$tag"
-			log "probe image set to $tag"
+		if running app; then
+			/usr/local/sbin/rmx-deploy-app "$tag"
+			log "app image set to $tag"
 		else
-			log "probe is not running: deploy $tag later with rmx-deploy-probe"
+			log "app is not running: deploy $tag later with rmx-deploy-app"
 		fi
 	fi
 

@@ -3,4 +3,4 @@
 #   sudo visudo -cf /etc/sudoers.d/deploy
 # The "deploy" user may run exactly one script as root, and only with an
 # argument shaped like sha-<7 hex> (sudo regex, needs sudo 1.9.10+).
-deploy ALL=(root) NOPASSWD: /usr/local/sbin/rmx-deploy-probe ^sha-[0-9a-f]{7}$
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/rmx-deploy-app ^sha-[0-9a-f]{7}$

@@ -3,7 +3,7 @@
 # (systemd + Docker inside), then check that a second run changes nothing and
 # that --check sees a manual change. Needs Docker with --privileged.
 #   ansible/test/container-test.sh
-# Not covered: the smoke test and Let's Encrypt (no DNS in a container), the swapfile, a real reboot, -e probe=on.
+# Not covered: the smoke test and Let's Encrypt (no DNS in a container), the swapfile, a real reboot.
 set -euo pipefail
 
 REPO=$(cd "$(dirname "$0")/../.." && pwd)

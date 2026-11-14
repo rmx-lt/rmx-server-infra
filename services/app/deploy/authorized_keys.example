@@ -3,4 +3,4 @@
 # replaces whatever the client asks to run. The client's text (the tag)
 # arrives as $SSH_ORIGINAL_COMMAND and is passed as one argument; the
 # script and the sudoers rule both validate it.
-restrict,command="sudo -n /usr/local/sbin/rmx-deploy-probe \"$SSH_ORIGINAL_COMMAND\"" ssh-ed25519 AAAA...public-key... rmx-backend-probe-deploy
+restrict,command="sudo -n /usr/local/sbin/rmx-deploy-app \"$SSH_ORIGINAL_COMMAND\"" ssh-ed25519 AAAA...public-key... rmx-server-app-deploy

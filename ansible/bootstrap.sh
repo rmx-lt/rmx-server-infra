@@ -10,7 +10,6 @@
 # the playbook, changing only what differs. Extra arguments go to ansible:
 #
 #   bash bootstrap.sh --check --diff     show what would change
-#   bash bootstrap.sh -e probe=on        also start the probe
 set -euo pipefail
 
 REPO=https://github.com/rmx-lt/rmx-server-infra.git

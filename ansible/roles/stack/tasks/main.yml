@@ -1,4 +1,4 @@
-# The Docker Compose stack in services/ (Caddy, Mosquitto, the probe), its
+# The Docker Compose stack in services/ (Caddy, Mosquitto, the app and its database), its
 # server-only files written from the vault, and the host helpers it needs.
 
 - name: Repo
@@ -10,8 +10,11 @@
 - name: Mosquitto files
   ansible.builtin.import_tasks: mosquitto.yml
 
-- name: Probe files
-  ansible.builtin.import_tasks: probe.yml
+- name: App files
+  ansible.builtin.import_tasks: app.yml
+
+- name: Remove the old probe
+  ansible.builtin.import_tasks: probe-cleanup.yml
 
 # Caddy first: it fetches the certificate Mosquitto needs to start.
 - name: Start Caddy
@@ -31,37 +34,34 @@
   changed_when: compose_up.stderr is search('Created|Recreated|Started')
   when: not ansible_check_mode
 
-# `docker compose up -d` does not enable the probe profile, so it never
-# recreates a running probe-app when probe/compose.yaml changes (issue 75).
-# Touch only that container, and only when it is already running. PROBE_TAG
-# stays the line in probe/.env. The 90 s health wait matches rmx-deploy-probe.
-- name: Is probe-app running
-  ansible.builtin.command: docker compose --profile probe ps -q --status running probe-app
+# The app is part of the stack (no profile), so `up -d` above also creates
+# it and recreates it when app/compose.yaml changes. APP_TAG stays the line
+# in app/.env. The wait matches rmx-deploy-app (a fresh database needs its
+# migrations first).
+- name: Wait until app is healthy
+  ansible.builtin.command: docker compose ps --format '{{ '{{' }}.Health{{ '}}' }}' app
   args: { chdir: "{{ services_dir }}" }
-  register: probe_app_running
+  register: app_health
+  until: app_health.stdout == 'healthy'
+  retries: 40
+  delay: 5
   changed_when: false
   when: not ansible_check_mode
 
-- name: Recreate probe-app when its compose definition changed
-  ansible.builtin.command: docker compose --profile probe up -d --no-deps probe-app
-  args: { chdir: "{{ services_dir }}" }
-  register: probe_app_recreate
-  changed_when: probe_app_recreate.stderr is search('Recreated')
-  when:
-    - not ansible_check_mode
-    - (probe_app_running.stdout | default('')) | length > 0
-
-- name: Wait until the recreated probe-app is healthy
-  ansible.builtin.command: docker compose --profile probe ps --format '{{ '{{' }}.Health{{ '}}' }}' probe-app
-  args: { chdir: "{{ services_dir }}" }
-  register: probe_app_health
-  until: probe_app_health.stdout == 'healthy'
-  retries: 30
-  delay: 3
-  changed_when: false
-  when:
-    - not ansible_check_mode
-    - probe_app_recreate is changed
+# The password goes in on stdin, never on a command line. A login that
+# exists already makes the command fail; that is fine.
+- name: App logins
+  ansible.builtin.command:
+    argv: [docker, compose, exec, -T, app, /app/rmx-server, create-user, "{{ item.key }}"]
+    stdin: "{{ item.value }}"
+    chdir: "{{ services_dir }}"
+  loop: "{{ vault_app_users | dict2items }}"
+  loop_control: { label: "{{ item.key }}" }
+  register: app_user
+  failed_when: false
+  changed_when: app_user.rc == 0
+  no_log: true
+  when: not ansible_check_mode
 
 # Docker's restart policy alone left Mosquitto down after a reboot (#37).
 - name: Boot unit that starts the stack
@@ -79,10 +79,6 @@
     daemon_reload: "{{ stack_unit.changed }}"
   # In --check the unit isn't written yet, so systemd can't find it (#43).
   when: not (ansible_check_mode and stack_unit.changed)
-
-- name: Probe on, with its app logins (-e probe=on)
-  ansible.builtin.import_tasks: probe-on.yml
-  when: probe == "on" and not ansible_check_mode
 
 - name: Apply config changes before the checks
   ansible.builtin.meta: flush_handlers

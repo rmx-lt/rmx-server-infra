@@ -9,13 +9,13 @@ An empty Ubuntu 24.04 VPS becomes RMX-SERVER with one command. The playbook desc
 | `ssh` | sshd: keys only, no root except from the provider dashboard, host keys from the vault |
 | `firewall` | ufw: only the ports in `group_vars/all/vars.yml` (`public_ports`); fail2ban |
 | `docker` | Docker Engine + Compose from Docker's apt repo (key fingerprint checked) |
-| `stack` | the clone in `/opt/rmx-vps`, the secrets of Caddy / Mosquitto / probe, cert-sync timer, deploy script, `docker compose up`, then a smoke test |
+| `stack` | the clone in `/opt/rmx-vps`, the secrets of Caddy / Mosquitto / the app, the old probe's removal, cert-sync timer, deploy script, `docker compose up` (which starts the app and its database), the app logins, then a smoke test |
 
 Everything [Server-Infra](Server-Infra) §3–§10 did by hand is in these roles. Settings that aren't secret are in [`group_vars/all/vars.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/ansible/group_vars/all/vars.yml); secrets are in `group_vars/all/vault.yml`, encrypted.
 
 ## The vault
 
-`vault.yml` holds every secret a rebuild needs: SSH host keys, Mosquitto passwords, the probe's database and app passwords, the deploy key. It is committed **encrypted** (AES-256, Ansible Vault); the repo is public, so use a long random vault password and keep it in your password manager. Lose it and the vault can't be opened.
+`vault.yml` holds every secret a rebuild needs: SSH host keys, Mosquitto passwords, the app's database password and web logins (`vault_app_db_password`, `vault_app_users`), the deploy key. It is committed **encrypted** (AES-256, Ansible Vault); the repo is public, so use a long random vault password and keep it in your password manager. Lose it and the vault can't be opened.
 
 ```bash
 # keep the passwords of the CURRENT server (once, on the old server, before reinstalling)
@@ -40,8 +40,8 @@ Template with every field: [`group_vars/all/vault.yml.example`](https://github.c
    It installs git and Ansible, clones this repo to `/opt/rmx-vps`, asks for the vault password and runs the playbook on the server itself. About 10 minutes.
    If it stops with "Could not get lock /var/lib/dpkg/lock-frontend", the fresh image is still running its first-boot update. Wait until `pgrep -x apt-get` prints nothing, then run the line again. The package step prints nothing for a few minutes: don't interrupt it.
 3. Check: the smoke test at the end of the run answers for the sites and MQTT's TLS port (passing tasks are not printed; look for `failed=0`). Then `ssh rmx-vps` from the PC (the host key is the same as before, so no warning). Until the playbook has run, the fresh image has its own host key: don't `ssh-keygen -R`, just wait.
-4. Start the probe: `bash /opt/rmx-vps/ansible/bootstrap.sh -e probe=on`.
-5. Get the data back (probe database, Mosquitto store, firmware images, probe tag). On the PC, download the newest `rmx-backup-<sha>` artifact of the `deploy` workflow (`gh run download <run-id> -R rmx-lt/rmx-server-infra`), decrypt it with `age -d -i age.key -o backup.tar.gz <file>` (in PowerShell never `>`: it corrupts binary files), then:
+4. The app and its database start with the stack, and the logins in `vault_app_users` are created once `app` is healthy (no extra step).
+5. Get the data back (app database, Mosquitto store, firmware images, app tag). On the PC, download the newest `rmx-backup-<sha>` artifact of the `deploy` workflow (`gh run download <run-id> -R rmx-lt/rmx-server-infra`), decrypt it with `age -d -i age.key -o backup.tar.gz <file>` (in PowerShell never `>`: it corrupts binary files), then:
 
    ```bash
    scp backup.tar.gz rmx-vps:/tmp/
@@ -61,7 +61,6 @@ cd /opt/rmx-vps/ansible
 ./bootstrap.sh --check --diff        # what would change (nothing is applied)
 ./bootstrap.sh                       # apply
 ./bootstrap.sh --tags ssh            # only one role: base users ssh firewall docker stack
-./bootstrap.sh -e probe=on           # also start the probe and create its app logins
 ./bootstrap.sh -e reset_mqtt_passwords=true   # after editing Mosquitto passwords in the vault
 ```
 
@@ -80,9 +79,9 @@ Feature branches are named `feat/<issue#>-slug`, and are deleted when their PR i
 | every PR and push | syntax, ansible-lint, vault encrypted · `test/container-test.sh` builds the server from empty in a container, a second run must change nothing, `--check` must see a manual change · `test/db-roundtrip.sh` backs up and restores a throwaway TimescaleDB and a Mosquitto store |
 | push to `production` | encrypted backup → `ansible --check --diff` → `ansible apply` (with its own smoke test) → smoke test from outside |
 
-**Backup before every deploy.** The runner asks the server for a tar.gz (`/etc`, `/opt/rmx-vps` with its secrets and Mosquitto's `store/`, and a `pg_dump` of the probe database when it runs), encrypts it with `age` and uploads it as an artifact kept for 7 days. The server never sees the private key. Download one from the run's page, then on the PC: `age -d -i key.txt rmx-backup-xxxxxxx.tar.gz.age > backup.tar.gz`. Changes between the last deploy and a wipe are not in it.
+**Backup before every deploy.** The runner asks the server for a tar.gz (`/etc`, `/opt/rmx-vps` with its secrets and Mosquitto's `store/`, and a `pg_dump` of the `app` database when `db` runs; the raw `app/data/db` folder is skipped, `app/.env` and `app/firmware/` are included), encrypts it with `age` and uploads it as an artifact kept for 7 days. The server never sees the private key. Download one from the run's page, then on the PC: `age -d -i key.txt rmx-backup-xxxxxxx.tar.gz.age > backup.tar.gz`. Changes between the last deploy and a wipe are not in it.
 
-**Restore data** after a rebuild (the playbook rebuilds config; this puts the data back): copy `backup.tar.gz` to the server, start the probe (`./bootstrap.sh -e probe=on`), then `sudo rmx-ci restore backup.tar.gz`. It recreates the database from the dump with TimescaleDB's restore procedure and puts Mosquitto's store back. Mosquitto saves its store every 5 minutes, so retained messages can be that old.
+**Restore data** after a rebuild (the playbook rebuilds config; this puts the data back): copy `backup.tar.gz` to the server, make sure `db` is running (`docker compose up -d db` in `/opt/rmx-vps/services`), then `sudo rmx-ci restore backup.tar.gz`. It recreates the database from the dump with TimescaleDB's restore procedure and puts Mosquitto's store back. Mosquitto saves its store every 5 minutes, so retained messages can be that old.
 
 **One-time setup (the maintainer):**
 
@@ -97,10 +96,11 @@ Feature branches are named `feat/<issue#>-slug`, and are deleted when their PR i
 ## What it does not do
 
 - Create or reinstall the VPS, DNS records, GitHub secrets, the device firmware: all outside the server.
-- Restore **data** by itself: after a reinstall the probe database and Mosquitto's retained messages start empty until you run `rmx-ci restore` with a backup (see CI/CD above).
+- Restore **data** by itself: after a reinstall the app database and Mosquitto's retained messages start empty until you run `rmx-ci restore` with a backup (see CI/CD above).
 - Remove things you delete from the playbook. A deleted task leaves its result on the server; add an explicit `state: absent` first, or reinstall.
 - Passwords of existing Mosquitto logins: it adds missing logins only (salted hashes can't be compared). To change one, edit the vault and run with `-e reset_mqtt_passwords=true`.
-- Probe: the database password only takes effect when the database is first created; the app logins only when you run with `-e probe=on`.
+- App: the database password only takes effect when the database is first created; a login in `vault_app_users` is created when it doesn't exist yet and never changed (use `set-password`, see [Server-Infra](Server-Infra) §10).
+- The old probe's data: the play removes the probe containers, its deploy script and lock, but not `services/probe/data` (the old database) or `/var/log/rmx-deploy-probe.log`; delete those by hand when the owner OKs it.
 
 ## Test it without risk
 

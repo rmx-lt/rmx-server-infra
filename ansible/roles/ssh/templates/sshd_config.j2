@@ -13,7 +13,7 @@ Subsystem sftp /usr/lib/openssh/sftp-server
 # Match blocks must stay at the END of this file: in sshd_config.d they
 # would also capture every setting read after them.
 
-# GitHub Actions users (probe deploy, this repo's CI): their keys already
+# GitHub Actions users (app deploy, this repo's CI): their keys already
 # have "restrict"; this makes sure no forwarding works for them even if the
 # key line changes.
 Match User deploy,ci
