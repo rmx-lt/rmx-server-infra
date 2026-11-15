@@ -3,7 +3,7 @@
 #
 # Variables come from app/.env (server only, gitignored; template
 # .env.example), read automatically for this included file: the passwords,
-# and APP_TAG=sha-xxxxxxx, the deployed image, rewritten by the deploy
+# the NTRIP settings, and APP_TAG=sha-xxxxxxx, the deployed image, rewritten by the deploy
 # script. No ${VAR:?} checks: they would break `docker compose` for the
 # whole stack (Caddy, Mosquitto) whenever the file is missing.
 # No ports are published: Caddy reaches app over rmx_edge,
@@ -76,13 +76,25 @@ services:
       # CSRF check). Required since the app has its own login.
       ALLOWED_ORIGINS: https://app.rmx.lt
       LOG_LEVEL: info
-      # Signed gateway images (<version>.bin), sent over MQTT. Empty would
-      # mean the app does not answer firmware requests.
+      # Signed firmware images (<version>.bin) per board, in /firmware/gateway
+      # and /firmware/autopilot, and job files (<job>.json) in /jobs, all sent
+      # over MQTT. Unset would mean the app serves none.
       FIRMWARE_DIR: /firmware
+      JOB_DIR: /jobs
+      # The NTRIP caster the app tells the gateways to use, from app/.env (set
+      # by hand, not in the vault). Empty = none: the app starts either way, but wants all of
+      # host, mountpoint, user and password, or none. Empty port = 2101.
+      NTRIP_HOST: ${NTRIP_HOST:-}
+      NTRIP_PORT: ${NTRIP_PORT:-}
+      NTRIP_MOUNTPOINT: ${NTRIP_MOUNTPOINT:-}
+      NTRIP_USER: ${NTRIP_USER:-}
+      NTRIP_PASSWORD: ${NTRIP_PASSWORD:-}
     volumes:
-      # Relative to this file: services/app/firmware. Read-only.
-      # The app runs as uid 65532, so those files must be world-readable.
+      # Relative to this file: services/app/firmware and services/app/jobs.
+      # Read-only. The app runs as uid 65532, so those files must be
+      # world-readable.
       - ./firmware:/firmware:ro
+      - ./jobs:/jobs:ro
     # Same check as the image's HEALTHCHECK (GET /health), but more
     # often, so the deploy script sees "healthy" within seconds.
     healthcheck:
