@@ -77,10 +77,9 @@ services:
       ALLOWED_ORIGINS: https://app.rmx.lt
       LOG_LEVEL: info
       # Signed firmware images (<version>.bin) per board, in /firmware/gateway
-      # and /firmware/autopilot, and job files (<job>.json) in /jobs, all sent
-      # over MQTT. Unset would mean the app serves none.
+      # and /firmware/autopilot, sent over MQTT. Unset would mean the app serves
+      # none.
       FIRMWARE_DIR: /firmware
-      JOB_DIR: /jobs
       # The NTRIP caster the app tells the gateways to use, from app/.env (set
       # by hand, not in the vault). Empty = none: the app starts either way, but wants all of
       # host, mountpoint, user and password, or none. Empty port = 2101.
@@ -90,11 +89,9 @@ services:
       NTRIP_USER: ${NTRIP_USER:-}
       NTRIP_PASSWORD: ${NTRIP_PASSWORD:-}
     volumes:
-      # Relative to this file: services/app/firmware and services/app/jobs.
-      # Read-only. The app runs as uid 65532, so those files must be
-      # world-readable.
+      # Relative to this file: services/app/firmware. Read-only. The app runs
+      # as uid 65532, so those files must be world-readable.
       - ./firmware:/firmware:ro
-      - ./jobs:/jobs:ro
     # Same check as the image's HEALTHCHECK (GET /health), but more
     # often, so the deploy script sees "healthy" within seconds.
     healthcheck:
