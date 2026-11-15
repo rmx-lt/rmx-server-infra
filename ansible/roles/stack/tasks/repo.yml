@@ -61,11 +61,17 @@
   become: true
   become_user: "{{ admin_user }}"
 
+- name: Is the repo a git clone
+  ansible.builtin.stat:
+    path: "{{ repo_dir }}/.git"
+  register: repo_git
+
+# Only in a clone (the container test copies the files). Not `removes:`: a
+# skipped command also returns rc 0, which would count as a change.
 - name: No push URL or commit identity in the clone
   ansible.builtin.command: git -C {{ repo_dir }} config --local --unset-all {{ item }}
   loop: [remote.origin.pushurl, user.name, user.email]
-  args:
-    removes: "{{ repo_dir }}/.git"  # only in a clone
+  when: repo_git.stat.exists
   register: git_unset
   changed_when: git_unset.rc == 0
   failed_when: git_unset.rc not in [0, 5]  # 5: was not set
