@@ -35,8 +35,8 @@
     state: absent
   loop: [/root, "/home/{{ admin_user }}"]
 
-# Fetch over HTTPS: the repo is public, so deploys (rmx-ci fetches origin)
-# never depend on the push key below. Only pushes use the key (pushurl).
+# Fetch over HTTPS: the repo is public, so no key is needed. The clone is
+# read-only; changes reach the server only through a PR and the deploy.
 - name: Fetch over HTTPS
   ansible.builtin.command: git -C {{ repo_dir }} config --local remote.origin.url {{ repo_url }}
   args:
@@ -45,47 +45,29 @@
   become_user: "{{ admin_user }}"
   changed_when: false
 
-# Optional push access from the server (wiki Server-Infra §9), with a deploy key that
-# can write to this repo only.
-- name: Push access from the server
-  when: vault_github_deploy_key | length > 0
-  block:
-    - name: GitHub deploy key
-      ansible.builtin.copy:
-        dest: /home/{{ admin_user }}/.ssh/github-rmx-vps
-        content: "{{ vault_github_deploy_key }}"
-        owner: "{{ admin_user }}"
-        group: "{{ admin_user }}"
-        mode: "0600"
-      no_log: true
+# The server could push with a deploy key until 2026-11 (rmx-server-infra#96);
+# remove the key, its ssh alias and the push settings.
+- name: Old GitHub push key and its ssh alias are gone
+  ansible.builtin.file:
+    path: /home/{{ admin_user }}/.ssh/{{ item }}
+    state: absent
+  loop: [github-rmx-vps, github-rmx-vps.pub, config]
 
-    - name: SSH alias for the deploy key
-      ansible.builtin.copy:
-        dest: /home/{{ admin_user }}/.ssh/config
-        content: |
-          Host github-rmx-vps
-              HostName github.com
-              User git
-              IdentityFile ~/.ssh/github-rmx-vps
-              IdentitiesOnly yes
-        owner: "{{ admin_user }}"
-        group: "{{ admin_user }}"
-        mode: "0600"
+- name: GitHub's host key is gone (only the push key used it)
+  ansible.builtin.known_hosts:
+    path: /home/{{ admin_user }}/.ssh/known_hosts
+    name: github.com
+    state: absent
+  become: true
+  become_user: "{{ admin_user }}"
 
-    - name: GitHub's host key
-      ansible.builtin.known_hosts:
-        path: /home/{{ admin_user }}/.ssh/known_hosts
-        name: github.com
-        key: github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
-      become: true
-      become_user: "{{ admin_user }}"
-
-    - name: Push over SSH with that key, and the commit identity
-      ansible.builtin.command: git -C {{ repo_dir }} config --local {{ item.name }} {{ item.value }}
-      loop:
-        - { name: remote.origin.pushurl, value: "git@github-rmx-vps:rmx-lt/rmx-server-infra.git" }
-        - { name: user.name, value: jRmx0 }
-        - { name: user.email, value: "116594512+jRmx0@users.noreply.github.com" }
-      become: true
-      become_user: "{{ admin_user }}"
-      changed_when: false
+- name: No push URL or commit identity in the clone
+  ansible.builtin.command: git -C {{ repo_dir }} config --local --unset-all {{ item }}
+  loop: [remote.origin.pushurl, user.name, user.email]
+  args:
+    removes: "{{ repo_dir }}/.git"  # only in a clone
+  register: git_unset
+  changed_when: git_unset.rc == 0
+  failed_when: git_unset.rc not in [0, 5]  # 5: was not set
+  become: true
+  become_user: "{{ admin_user }}"
