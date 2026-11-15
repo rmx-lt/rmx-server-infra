@@ -327,7 +327,7 @@ The LTE modem board ([rmx-mower-gateway](https://github.com/rmx-lt/rmx-mower-gat
 - Permissions: the image runs as uid 65532, which is not in the admin user's group. Ansible sets every file under `app/firmware/` and `app/jobs/` to `0644`. An upload from `tools/release.ps1` can land owner-only; the next play makes it readable.
 - Old layouts: the images used to live in `services/caddy/firmware/probe/` and then loose in `app/firmware/`. Each play moves any `*.bin` found in either place into `app/firmware/gateway/` (`mv -n`: an image already there is never overwritten) and removes the empty old Caddy folders. With nothing to move it changes nothing, so it is safe to run again. It does not stop or restart anything. An app image older than the chunk-transfer change (rmx-server-app pull 97) looks for `/firmware/<version>.bin` and does not find the moved files, so deploy the new app image with this change.
 - Trust: the images are signed with a key that exists only on the PC, and the device refuses an image with any other signature, so a hacked server can't push its own firmware. The device only reaches the files over its certificate login.
-- Upload: `tools/release.ps1` in rmx-mower-gateway (scp as rmx into `services/app/firmware/gateway/`; its upload path must change to that folder, see [issue 85](https://github.com/rmx-lt/rmx-server-infra/issues/85)). Autopilot images go to `services/app/firmware/autopilot/`.
+- Upload: `tools/release.ps1` in rmx-mower-gateway (scp as rmx into `services/app/firmware/gateway/`). Autopilot images go to `services/app/firmware/autopilot/`.
 
 ### Mosquitto (MQTT)
 
