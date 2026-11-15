@@ -39,7 +39,7 @@ Template with every field: [`group_vars/all/vault.yml.example`](https://github.c
 
    It installs git and Ansible, clones this repo to `/opt/rmx-vps`, asks for the vault password and runs the playbook on the server itself. About 10 minutes.
    If it stops with "Could not get lock /var/lib/dpkg/lock-frontend", the fresh image is still running its first-boot update. Wait until `pgrep -x apt-get` prints nothing, then run the line again. The package step prints nothing for a few minutes: don't interrupt it.
-3. Check: the smoke test at the end of the run answers for the sites, `/app/health` and MQTT's TLS port (passing tasks are not printed; look for `failed=0`). Then `ssh rmx-vps` from the PC (the host key is the same as before, so no warning). Until the playbook has run, the fresh image has its own host key: don't `ssh-keygen -R`, just wait.
+3. Check: the smoke test at the end of the run answers for the sites, the app's `/health` and MQTT's TLS port (passing tasks are not printed; look for `failed=0`). Then `ssh rmx-vps` from the PC (the host key is the same as before, so no warning). Until the playbook has run, the fresh image has its own host key: don't `ssh-keygen -R`, just wait.
 4. The app and its database start with the stack, and the logins in `vault_app_users` are created once `app` is healthy (no extra step).
 5. Get the data back (app database, Mosquitto store, firmware images, app tag). On the PC, download the newest `rmx-backup-<sha>` artifact of the `deploy` workflow (`gh run download <run-id> -R rmx-lt/rmx-server-infra`), decrypt it with `age -d -i age.key -o backup.tar.gz <file>` (in PowerShell never `>`: it corrupts binary files), then:
 
