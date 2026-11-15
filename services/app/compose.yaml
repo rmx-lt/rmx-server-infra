@@ -74,7 +74,7 @@ services:
       MQTT_PASSWORD: ${APP_MQTT_PASSWORD}
       # Pages that may log in, change data and open the WebSocket (the app's
       # CSRF check). Required since the app has its own login.
-      ALLOWED_ORIGINS: https://rmx.lt
+      ALLOWED_ORIGINS: https://app.rmx.lt
       LOG_LEVEL: info
       # Signed gateway images (<version>.bin), sent over MQTT. Empty would
       # mean the app does not answer firmware requests.
@@ -83,7 +83,7 @@ services:
       # Relative to this file: services/app/firmware. Read-only.
       # The app runs as uid 65532, so those files must be world-readable.
       - ./firmware:/firmware:ro
-    # Same check as the image's HEALTHCHECK (GET /app/health), but more
+    # Same check as the image's HEALTHCHECK (GET /health), but more
     # often, so the deploy script sees "healthy" within seconds.
     healthcheck:
       test: ["CMD", "/app/rmx-server", "healthcheck"]
