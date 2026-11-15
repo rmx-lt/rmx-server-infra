@@ -46,9 +46,6 @@ pairs() { awk 'NF==2 {print "  " $1 ": " $2}' "$1" 2>/dev/null || true; }
 	echo
 	echo "# The public half of DEPLOY_SSH_KEY, from /home/deploy/.ssh/authorized_keys."
 	echo "vault_deploy_ssh_key: $(sed -n 's/^.*\(ssh-ed25519 [A-Za-z0-9+\/=]* [^ ]*\)$/\1/p' /home/deploy/.ssh/authorized_keys 2>/dev/null | head -1)"
-	echo
-	echo "vault_github_deploy_key: |"
-	if [[ -f /home/rmx/.ssh/github-rmx-vps ]]; then sed 's/^/  /' /home/rmx/.ssh/github-rmx-vps; else echo "  "; fi
 } >"$OUT"
 chmod 600 "$OUT"
 chown "${SUDO_USER:-root}": "$OUT"
