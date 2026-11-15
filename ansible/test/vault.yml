@@ -9,4 +9,3 @@ vault_app_users:
   admin: test-only
 vault_deploy_ssh_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMadeUpKeyForTestsOnlyMadeUpKeyForTestsOnly0 test
 vault_ci_ssh_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMadeUpKeyForTestsOnlyMadeUpKeyForTestsOnly1 test
-vault_github_deploy_key: ""

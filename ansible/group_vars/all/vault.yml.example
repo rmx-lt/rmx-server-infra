@@ -37,7 +37,3 @@ vault_deploy_ssh_key: ssh-ed25519 AAAA... rmx-server-app-deploy
 # Optional: public key of the CI key (GitHub secret CI_SSH_KEY, deploy.yml).
 # Without it the ci user is not created and the server is deployed by hand.
 vault_ci_ssh_key: ""
-
-# Optional: private deploy key with write access to this repo, so the server
-# can push (wiki Server-Infra §9). Leave empty and the server clone stays read-only.
-vault_github_deploy_key: ""

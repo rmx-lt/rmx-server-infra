@@ -15,7 +15,7 @@ Everything [Server-Infra](Server-Infra) §3–§10 did by hand is in these roles
 
 ## The vault
 
-`vault.yml` holds every secret a rebuild needs: SSH host keys, Mosquitto passwords, the app's database password and web logins (`vault_app_db_password`, `vault_app_users`), the deploy key. It is committed **encrypted** (AES-256, Ansible Vault); the repo is public, so use a long random vault password and keep it in your password manager. Lose it and the vault can't be opened.
+`vault.yml` holds every secret a rebuild needs: SSH host keys, Mosquitto passwords, the app's database password and web logins (`vault_app_db_password`, `vault_app_users`), the public halves of the app deploy and CI keys. No key that can push to GitHub: the server clone is read-only. It is committed **encrypted** (AES-256, Ansible Vault); the repo is public, so use a long random vault password and keep it in your password manager. Lose it and the vault can't be opened.
 
 ```bash
 # keep the passwords of the CURRENT server (once, on the old server, before reinstalling)
