@@ -280,7 +280,6 @@ services/
     ├── .env.example      # template for .env (server only: passwords, NTRIP settings, APP_TAG the deployed image)
     ├── deploy/           # deploy script, sudoers rule, authorized_keys template
     ├── firmware/         # (server only, gitignored) gateway/ and autopilot/: signed images <version>.bin
-    ├── jobs/             # (server only, gitignored) job files <job>.json
     └── data/             # (server only, gitignored) database files, credentials.txt
 ```
 
@@ -318,13 +317,13 @@ Not public (reachable only by containers on `rmx_edge`): Mosquitto's plain MQTT 
 - Certificates: Let's Encrypt (issuers `YE1`/`YE2`), one per name, obtained automatically on first start (2026-10-15, valid until 2027-01-13). Caddy renews them about 30 days before they expire. No ACME email is set (Let's Encrypt no longer sends expiry emails, and an email would end up in this public repo).
 - State: `services/caddy/data/data` → `/data` (certs, ACME account key) and `services/caddy/data/config` → `/config`. If these are deleted, Caddy just requests new certificates. Let's Encrypt allows 5 duplicate certificates per week, so don't delete them in a loop.
 
-### Firmware images and job files (OTA)
+### Firmware images (OTA)
 
 The LTE modem board ([rmx-mower-gateway](https://github.com/rmx-lt/rmx-mower-gateway), wiki [Mower-Gateway → Firmware updates](Mower-Gateway#firmware-updates-ota)) downloads new firmware over MQTT from the app (wiki [Server-App → Firmware over MQTT](Server-App)). There is no HTTPS download: Caddy's `/fw/` route and its basic-auth logins were removed on 2026-11-13 ([issue 79](https://github.com/rmx-lt/rmx-server-infra/issues/79)).
 
 - Firmware: one folder per board, `services/app/firmware/gateway/<version>.bin` and `services/app/firmware/autopilot/<version>.bin` on the host. `app/firmware/` is mounted read-only into the app at `/firmware` (`FIRMWARE_DIR=/firmware` in `app/compose.yaml`), and the app looks in its `gateway/` and `autopilot/` subfolders (wiki [Server-App](Server-App)). Both folders are mode `0755`, owned by the admin user.
-- Job files: `services/app/jobs/<job>.json`, mounted read-only at `/jobs` (`JOB_DIR=/jobs`). Job planning in the app will write them; until then they are put there by hand.
-- Permissions: the image runs as uid 65532, which is not in the admin user's group. Ansible sets every file under `app/firmware/` and `app/jobs/` to `0644`. An upload from `tools/release.ps1` can land owner-only; the next play makes it readable.
+- Job paths are stored in the app's database, so there is no job directory. The play deletes a leftover `services/app/jobs/` on the server (issue 109).
+- Permissions: the image runs as uid 65532, which is not in the admin user's group. Ansible sets every file under `app/firmware/` to `0644`. An upload from `tools/release.ps1` can land owner-only; the next play makes it readable.
 - Old layouts: the images used to live in `services/caddy/firmware/probe/` and then loose in `app/firmware/`. Each play moves any `*.bin` found in either place into `app/firmware/gateway/` (`mv -n`: an image already there is never overwritten) and removes the empty old Caddy folders. With nothing to move it changes nothing, so it is safe to run again. It does not stop or restart anything. An app image older than the chunk-transfer change (rmx-server-app pull 97) looks for `/firmware/<version>.bin` and does not find the moved files, so deploy the new app image with this change.
 - Trust: the images are signed with a key that exists only on the PC, and the device refuses an image with any other signature, so a hacked server can't push its own firmware. The device only reaches the files over its certificate login.
 - Upload: `tools/release.ps1` in rmx-mower-gateway (scp as rmx into `services/app/firmware/gateway/`). Autopilot images go to `services/app/firmware/autopilot/`.
@@ -448,7 +447,7 @@ Check the certificates from the PC: `curl.exe -vI https://rmx.lt` (Windows curl 
 | Container | Image | Networks | Memory | Notes |
 |---|---|---|---|---|
 | `db` | `timescale/timescaledb:2.30.2-pg17` | `rmx_backend` | `mem_limit 256m` (~60 MB used) | No ports. User and database `app`. Tuned small: `shared_buffers=32MB`, `work_mem=2MB`, `max_connections=20`, no parallel workers, `timescaledb.max_background_workers=3`, `timescaledb.telemetry_level=off`. Data in `app/data/db/` |
-| `app` | `ghcr.io/rmx-lt/rmx-server-app:${APP_TAG}` | `rmx_edge` + `rmx_backend` | `mem_limit 64m` | No ports; Caddy proxies to `app:8080`. Health check every 5 s (`/app/rmx-server healthcheck`, i.e. `GET /health`). A static Go binary on `distroless/static`, `GOMEMLIMIT=40MiB` inside the 64 MB limit. Environment: `DATABASE_URL`, `MQTT_HOST=mosquitto`, `MQTT_PORT=1883`, `MQTT_USERNAME=app`, `MQTT_PASSWORD`, `ALLOWED_ORIGINS=https://app.rmx.lt`, `LOG_LEVEL=info`, `FIRMWARE_DIR=/firmware`, `JOB_DIR=/jobs`, and `NTRIP_HOST`, `NTRIP_PORT`, `NTRIP_MOUNTPOINT`, `NTRIP_USER`, `NTRIP_PASSWORD` (from `app/.env`, empty = no caster; see [NTRIP settings](#ntrip-settings)). `BIND_ADDR` and `STATIC_DIR` are set in the image; `MQTT_CLIENT_ID`, `MQTT_TOPIC_PREFIX` and `DB_MAX_CONNECTIONS` use the app's defaults |
+| `app` | `ghcr.io/rmx-lt/rmx-server-app:${APP_TAG}` | `rmx_edge` + `rmx_backend` | `mem_limit 64m` | No ports; Caddy proxies to `app:8080`. Health check every 5 s (`/app/rmx-server healthcheck`, i.e. `GET /health`). A static Go binary on `distroless/static`, `GOMEMLIMIT=40MiB` inside the 64 MB limit. Environment: `DATABASE_URL`, `MQTT_HOST=mosquitto`, `MQTT_PORT=1883`, `MQTT_USERNAME=app`, `MQTT_PASSWORD`, `ALLOWED_ORIGINS=https://app.rmx.lt`, `LOG_LEVEL=info`, `FIRMWARE_DIR=/firmware`, and `NTRIP_HOST`, `NTRIP_PORT`, `NTRIP_MOUNTPOINT`, `NTRIP_USER`, `NTRIP_PASSWORD` (from `app/.env`, empty = no caster; see [NTRIP settings](#ntrip-settings)). `BIND_ADDR` and `STATIC_DIR` are set in the image; `MQTT_CLIENT_ID`, `MQTT_TOPIC_PREFIX` and `DB_MAX_CONNECTIONS` use the app's defaults |
 
 > **The app and its database are always on.** Do not stop `app` or `db` unless the owner asks. The old probe's database in `services/probe/data` is no longer used or backed up as a database; it was deleted on 2026-11-14.
 
@@ -458,8 +457,7 @@ Check the certificates from the PC: `curl.exe -vI https://rmx.lt` (Windows curl 
 |---|---|---|
 | `app/.env` | rmx, `0600` | `APP_DB_PASSWORD`, `APP_MQTT_PASSWORD`, the `NTRIP_*` settings (see [NTRIP settings](#ntrip-settings)) and `APP_TAG`, the deployed image (`production` on a fresh server, then `sha-…`; template: [`.env.example`](https://github.com/rmx-lt/rmx-server-infra/blob/development/services/app/.env.example)). **Only the deploy script changes `APP_TAG`**: a deploy is just "rewrite that line + recreate app". rmx owns the file because `docker compose` (run as rmx) must read it |
 | `app/data/credentials.txt` | root, `0600` | Plain-text copies: the app logins, DB password |
-| `app/firmware/` | rmx, `0755` | OTA images per board: `gateway/` and `autopilot/` (`*.bin`), see [Firmware images](#firmware-images-and-job-files-ota) |
-| `app/jobs/` | rmx, `0755` | job files (`*.json`), same section |
+| `app/firmware/` | rmx, `0755` | OTA images per board: `gateway/` and `autopilot/` (`*.bin`), see [Firmware images](#firmware-images-ota) |
 | `mosquitto/data/credentials.txt` | root, `0600` | Also holds `app` |
 
 ### NTRIP settings

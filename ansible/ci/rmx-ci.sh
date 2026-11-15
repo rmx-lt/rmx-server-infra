@@ -52,7 +52,7 @@ restore() {
 	mk_tmp
 	local rel=${REPO#/}
 	tar -xzf "$file" -C "$TMP" ./app.dump "$rel/services/mosquitto/data/store" \
-		"$rel/services/app/firmware" "$rel/services/app/jobs" "$rel/services/app/.env" 2>/dev/null || true
+		"$rel/services/app/firmware" "$rel/services/app/.env" 2>/dev/null || true
 
 	if [[ -f $TMP/app.dump ]]; then
 		running db || die "db is not running (start it: docker compose up -d db)"
@@ -79,15 +79,6 @@ restore() {
 		cp -a "$fw/." "$REPO/services/app/firmware/"
 		chown -R "$ADMIN:$ADMIN" "$REPO/services/app/firmware"
 		log "firmware images restored"
-	fi
-
-	# Job files, the same way.
-	local jobs=$TMP/$rel/services/app/jobs
-	if [[ -d $jobs ]]; then
-		mkdir -p "$REPO/services/app/jobs"
-		cp -a "$jobs/." "$REPO/services/app/jobs/"
-		chown -R "$ADMIN:$ADMIN" "$REPO/services/app/jobs"
-		log "job files restored"
 	fi
 
 	# The app image that was deployed, not the (possibly older) one in the vault.
