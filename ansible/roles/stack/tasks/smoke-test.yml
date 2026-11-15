@@ -13,7 +13,6 @@
   failed_when: smoke_http.stdout != item.expect
   loop:
     - { host: rmx.lt, path: /, expect: "200" }
-    - { host: api.rmx.lt, path: /, expect: "200" }
     - { host: www.rmx.lt, path: /, expect: "301" }
   loop_control: { label: "{{ item.host }}{{ item.path }} -> {{ item.expect }}" }
 
@@ -27,11 +26,11 @@
   delay: 5
   changed_when: false
 
-# Check the body, not only the status: a stale Caddy config answered /app/health
-# with its 200 placeholder (issue 93).
+# Check the body, not only the status: a stale Caddy config answered the health URL
+# with a 200 placeholder (issue 93).
 - name: App health
   ansible.builtin.command: >
-    curl -fsS --noproxy '*' --resolve rmx.lt:443:127.0.0.1 https://rmx.lt/app/health
+    curl -fsS --noproxy '*' --resolve app.rmx.lt:443:127.0.0.1 https://app.rmx.lt/health
   register: smoke_app
   until: smoke_app.stdout is search('"status":"ok"')
   retries: 12

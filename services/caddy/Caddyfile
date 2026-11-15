@@ -12,43 +12,26 @@
 	}
 }
 
-# Main site: placeholder page, and rmx-server-app under /app
+# Main site: static placeholder page
 rmx.lt {
-	# rmx-server-app. The prefix is kept: the app serves /app/... itself,
-	# including its own login: a session cookie (Path=/app) checked by the
-	# app on the API and /app/ws (wiki page Server-App, "Login and
-	# sessions"). Only /app/health, login/logout and the static page (public
-	# code, no data) work without a session.
-	# Caddy adds no auth of its own (basic auth broke WebSockets on
-	# iPhones). While the app is down, app doesn't resolve and Caddy answers
-	# 502, so nothing under /app is open.
-	# Caddy passes Cookie and Origin through and sets X-Forwarded-For to the
-	# real client IP (it ignores one sent by the client), which the app's
-	# login rate limit uses.
-	@app path /app /app/*
-	handle @app {
-		reverse_proxy app:8080
-	}
-
-	handle {
-		root * /srv/site
-		file_server
-		encode zstd gzip
-	}
+	root * /srv/site
+	file_server
+	encode zstd gzip
 }
 
-# API: placeholder. The app moved to https://rmx.lt/app/ (issue 97);
-# old links under /app redirect there.
-api.rmx.lt {
-	@app path /app /app/*
-	handle @app {
-		redir https://rmx.lt{uri} 308
-	}
-
-	handle {
-		header Content-Type application/json
-		respond `{"service":"rmx-api","status":"placeholder"}` 200
-	}
+# rmx-server-app, at the root of its own host: /, /api/..., /ws, /health.
+# The app has its own login: a session cookie (__Host-app_session, Path=/)
+# checked by the app on the API and /ws (wiki page Server-App, "Login and
+# sessions"). Only /health, login/logout and the static page (public code,
+# no data) work without a session.
+# Caddy adds no auth of its own (basic auth broke WebSockets on iPhones).
+# While the app is down, app doesn't resolve and Caddy answers 502, so
+# nothing on this host is open.
+# Caddy passes Cookie and Origin through and sets X-Forwarded-For to the
+# real client IP (it ignores one sent by the client), which the app's
+# login rate limit uses.
+app.rmx.lt {
+	reverse_proxy app:8080
 }
 
 # www -> bare domain (301, keeps the path)
