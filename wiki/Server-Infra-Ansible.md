@@ -77,7 +77,7 @@ Feature branches are named `feat/<issue#>-slug`, and are deleted when their PR i
 | When | What runs ([`ci.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/.github/workflows/ci.yml), [`deploy.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/.github/workflows/deploy.yml)) |
 |---|---|
 | PR to `development`, push to `development` | syntax, ansible-lint, vault encrypted · `test/container-test.sh` builds the server from empty in a container, a second run must change nothing, `--check` must see a manual change · `test/db-roundtrip.sh` backs up and restores a throwaway TimescaleDB and a Mosquitto store |
-| push to `production` (outside `wiki/`), or a manual run of `deploy` on `production` | encrypted backup → `ansible --check --diff` → `ansible apply` (with its own smoke test) → smoke test from outside |
+| push to `production` (outside `wiki/`), or a manual run of `deploy` on `production` (Actions → deploy → Run workflow; a run started from another branch is skipped) | encrypted backup → `ansible --check --diff` → `ansible apply` (with its own smoke test) → smoke test from outside |
 
 The `development` → `production` PR runs no checks of its own: its head is the `development` tip, which the push run already checked. A newer PR commit or `development` push cancels the older CI run.
 
@@ -87,7 +87,7 @@ The `development` → `production` PR runs no checks of its own: its head is the
 
 **One-time setup (the maintainer):**
 
-1. Create branches `development` and `production` from the initial commit; protect them (Settings → Branches: require a PR and the `check`, `db-roundtrip` and `container` checks). Add a `production` environment (Settings → Environments) limited to the `production` branch.
+1. Create branches `development` and `production` from the initial commit. Their protection (PR only, the `check`, `db-roundtrip` and `container` checks) comes from the branch rulesets in blade-of-grass `tools/rulesets/` ([Pipelines](https://github.com/rmx-lt/blade-of-grass/wiki/Pipelines)), not from Settings → Branches. Add a `production` environment (Settings → Environments) limited to the `production` branch.
 2. `ssh-keygen -t ed25519 -N "" -C rmx-vps-ci -f ci_key`. Put the **public** half in the vault as `vault_ci_ssh_key`, the **private** half in the environment secret `CI_SSH_KEY`, then delete both files.
 3. `age-keygen -o age.key` on the PC: the public key (`age1…`) is the secret `AGE_PUBLIC_KEY`; keep `age.key` in the password manager.
 4. `VAULT_PASSWORD` = the Ansible Vault password; `CI_KNOWN_HOSTS` = `45.81.252.43 ` + the first two fields of `/etc/ssh/ssh_host_ed25519_key.pub`.
