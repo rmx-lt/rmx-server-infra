@@ -87,7 +87,7 @@ The `development` → `production` PR runs no checks of its own: its head is the
 
 **One-time setup (the maintainer):**
 
-1. Create branches `development` and `production` from the initial commit; protect them (Settings → Branches: require a PR and the `check`, `db-roundtrip` and `container` checks). Add a `production` environment (Settings → Environments) limited to the `production` branch.
+1. Create branches `development` and `production` from the initial commit. Their protection (PR only, the `check`, `db-roundtrip` and `container` checks) comes from the branch rulesets in blade-of-grass `tools/rulesets/` ([Pipelines](https://github.com/rmx-lt/blade-of-grass/wiki/Pipelines)), not from Settings → Branches. Add a `production` environment (Settings → Environments) limited to the `production` branch.
 2. `ssh-keygen -t ed25519 -N "" -C rmx-vps-ci -f ci_key`. Put the **public** half in the vault as `vault_ci_ssh_key`, the **private** half in the environment secret `CI_SSH_KEY`, then delete both files.
 3. `age-keygen -o age.key` on the PC: the public key (`age1…`) is the secret `AGE_PUBLIC_KEY`; keep `age.key` in the password manager.
 4. `VAULT_PASSWORD` = the Ansible Vault password; `CI_KNOWN_HOSTS` = `45.81.252.43 ` + the first two fields of `/etc/ssh/ssh_host_ed25519_key.pub`.
