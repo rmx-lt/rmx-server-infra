@@ -1,7 +1,9 @@
+# Deploys the server: encrypted backup, ansible --check --diff, ansible apply, then the server is probed from outside.
+# Runs on every push to `production` that changes something outside wiki/ (a merged PR from `development`), or by
+# hand (Actions -> deploy -> Run workflow on `production`) to redeploy. Why separate from ci.yml: checks run on
+# `development`, deploys only from `production`. A manual run from another branch does nothing.
 name: deploy
 
-# Every push to `production` that changes something outside wiki/ (a merged PR from `development`): encrypted backup,
-# ansible --check --diff, ansible apply, then the server is probed from outside.
 # Secrets (repository settings -> Environments -> production):
 #   CI_SSH_KEY       private key of the `ci` user (public half: vault_ci_ssh_key)
 #   CI_KNOWN_HOSTS   one line: `45.81.252.43 ssh-ed25519 AAAA...` (the server's host key)
@@ -11,6 +13,7 @@ on:
   push:
     branches: [production]
     paths-ignore: ['wiki/**']
+  workflow_dispatch:
 
 # One deploy at a time; a newer push waits instead of cancelling a running apply.
 concurrency:
@@ -25,6 +28,7 @@ env:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/production'
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 30
@@ -58,7 +62,7 @@ jobs:
           test "$(stat -c %s "rmx-backup-${GITHUB_SHA::7}.tar.gz.age")" -gt 10000
 
       # Encrypted, so a public repo's artifact (readable by any signed-in GitHub user) leaks nothing.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: rmx-backup-${{ github.sha }}
           path: rmx-backup-*.tar.gz.age

@@ -1,4 +1,4 @@
-# The app's server-only files, its firmware and job folders and the deploy
+# The app's server-only files, its firmware folders and the deploy
 # script (wiki Server-Infra §10 "App"). The containers start with the rest of the
 # stack (main.yml); the old probe is removed by probe-cleanup.yml.
 
@@ -24,8 +24,7 @@
     mode: "0755"
 
 # The firmware images, one folder per board (FIRMWARE_DIR/gateway and
-# FIRMWARE_DIR/autopilot), and the job files (JOB_DIR). The app serves both
-# over MQTT, read-only.
+# FIRMWARE_DIR/autopilot). The app serves them over MQTT, read-only.
 - name: App firmware folders
   ansible.builtin.file:
     path: "{{ item }}"
@@ -38,13 +37,13 @@
     - "{{ services_dir }}/app/firmware/gateway"
     - "{{ services_dir }}/app/firmware/autopilot"
 
-- name: App job folder
+# The app keeps job paths in its database and no longer reads app/jobs.
+# Removes the folder and anything in it (it was empty or hand-placed files the
+# app ignores); a no-op once gone.
+- name: Remove the unused app job folder
   ansible.builtin.file:
     path: "{{ services_dir }}/app/jobs"
-    state: directory
-    owner: "{{ admin_user }}"
-    group: "{{ admin_user }}"
-    mode: "0755"
+    state: absent
 
 # The gateway images used to live in caddy/firmware/probe, and after that
 # loose in app/firmware. Move them into app/firmware/gateway. Both moves do
@@ -108,18 +107,17 @@
 # The app is uid 65532 and is not in the admin group. The folders stay 0755
 # (other can traverse). An scp upload can be owner-only; make the files
 # world-readable.
-- name: Firmware images and job files
+- name: Firmware images
   ansible.builtin.find:
     paths:
       - "{{ services_dir }}/app/firmware"
-      - "{{ services_dir }}/app/jobs"
     file_type: file
     recurse: true
     follow: false
   register: app_served_files
   when: not ansible_check_mode or app_data_before.stat.exists
 
-- name: Firmware images and job files readable by the app
+- name: Firmware images readable by the app
   ansible.builtin.file:
     path: "{{ item.path }}"
     mode: "0644"

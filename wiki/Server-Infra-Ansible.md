@@ -41,7 +41,7 @@ Template with every field: [`group_vars/all/vault.yml.example`](https://github.c
    If it stops with "Could not get lock /var/lib/dpkg/lock-frontend", the fresh image is still running its first-boot update. Wait until `pgrep -x apt-get` prints nothing, then run the line again. The package step prints nothing for a few minutes: don't interrupt it.
 3. Check: the smoke test at the end of the run answers for the sites, the app's `/health` and MQTT's TLS port (passing tasks are not printed; look for `failed=0`). Then `ssh rmx-vps` from the PC (the host key is the same as before, so no warning). Until the playbook has run, the fresh image has its own host key: don't `ssh-keygen -R`, just wait.
 4. The app and its database start with the stack, and the logins in `vault_app_users` are created once `app` is healthy (no extra step).
-5. Get the data back (app database, Mosquitto store, firmware images, job files, app tag). On the PC, download the newest `rmx-backup-<sha>` artifact of the `deploy` workflow (`gh run download <run-id> -R rmx-lt/rmx-server-infra`), decrypt it with `age -d -i age.key -o backup.tar.gz <file>` (in PowerShell never `>`: it corrupts binary files), then:
+5. Get the data back (app database, Mosquitto store, firmware images, app tag). On the PC, download the newest `rmx-backup-<sha>` artifact of the `deploy` workflow (`gh run download <run-id> -R rmx-lt/rmx-server-infra`), decrypt it with `age -d -i age.key -o backup.tar.gz <file>` (in PowerShell never `>`: it corrupts binary files), then:
 
    ```bash
    scp backup.tar.gz rmx-vps:/tmp/
@@ -74,12 +74,14 @@ Branches: `feat/*` → PR → `development` → PR → `production`. Both stable
 
 Feature branches are named `feat/<issue#>-slug`, and are deleted when their PR is merged (the repo deletes them automatically).
 
-| When | What runs ([`ansible.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/.github/workflows/ansible.yml), [`deploy.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/.github/workflows/deploy.yml)) |
+| When | What runs ([`ci.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/.github/workflows/ci.yml), [`deploy.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/.github/workflows/deploy.yml)) |
 |---|---|
-| every PR and push | syntax, ansible-lint, vault encrypted · `test/container-test.sh` builds the server from empty in a container, a second run must change nothing, `--check` must see a manual change · `test/db-roundtrip.sh` backs up and restores a throwaway TimescaleDB and a Mosquitto store |
-| push to `production` | encrypted backup → `ansible --check --diff` → `ansible apply` (with its own smoke test) → smoke test from outside |
+| PR to `development`, push to `development` | syntax, ansible-lint, vault encrypted · `test/container-test.sh` builds the server from empty in a container, a second run must change nothing, `--check` must see a manual change · `test/db-roundtrip.sh` backs up and restores a throwaway TimescaleDB and a Mosquitto store |
+| push to `production` (outside `wiki/`), or a manual run of `deploy` on `production` | encrypted backup → `ansible --check --diff` → `ansible apply` (with its own smoke test) → smoke test from outside |
 
-**Backup before every deploy.** The runner asks the server for a tar.gz (`/etc`, `/opt/rmx-vps` with its secrets and Mosquitto's `store/`, and a `pg_dump` of the `app` database when `db` runs; the raw `app/data/db` folder is skipped, `app/.env`, `app/firmware/` and `app/jobs/` are included), encrypts it with `age` and uploads it as an artifact kept for 7 days. The server never sees the private key. Download one from the run's page, then on the PC: `age -d -i key.txt rmx-backup-xxxxxxx.tar.gz.age > backup.tar.gz`. Changes between the last deploy and a wipe are not in it.
+The `development` → `production` PR runs no checks of its own: its head is the `development` tip, which the push run already checked. A newer PR commit or `development` push cancels the older CI run.
+
+**Backup before every deploy.** The runner asks the server for a tar.gz (`/etc`, `/opt/rmx-vps` with its secrets and Mosquitto's `store/`, and a `pg_dump` of the `app` database when `db` runs; the raw `app/data/db` folder is skipped, `app/.env` and `app/firmware/` are included), encrypts it with `age` and uploads it as an artifact kept for 7 days. The server never sees the private key. Download one from the run's page, then on the PC: `age -d -i key.txt rmx-backup-xxxxxxx.tar.gz.age > backup.tar.gz`. Changes between the last deploy and a wipe are not in it.
 
 **Restore data** after a rebuild (the playbook rebuilds config; this puts the data back): copy `backup.tar.gz` to the server, make sure `db` is running (`docker compose up -d db` in `/opt/rmx-vps/services`), then `sudo rmx-ci restore backup.tar.gz`. It recreates the database from the dump with TimescaleDB's restore procedure and puts Mosquitto's store back. Mosquitto saves its store every 5 minutes, so retained messages can be that old.
 
