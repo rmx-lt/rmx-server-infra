@@ -74,10 +74,12 @@ Branches: `feat/*` → PR → `development` → PR → `production`. Both stable
 
 Feature branches are named `feat/<issue#>-slug`, and are deleted when their PR is merged (the repo deletes them automatically).
 
-| When | What runs ([`ansible.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/.github/workflows/ansible.yml), [`deploy.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/.github/workflows/deploy.yml)) |
+| When | What runs ([`ci.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/.github/workflows/ci.yml), [`deploy.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/.github/workflows/deploy.yml)) |
 |---|---|
-| every PR and push | syntax, ansible-lint, vault encrypted · `test/container-test.sh` builds the server from empty in a container, a second run must change nothing, `--check` must see a manual change · `test/db-roundtrip.sh` backs up and restores a throwaway TimescaleDB and a Mosquitto store |
-| push to `production` | encrypted backup → `ansible --check --diff` → `ansible apply` (with its own smoke test) → smoke test from outside |
+| PR to `development`, push to `development` | syntax, ansible-lint, vault encrypted · `test/container-test.sh` builds the server from empty in a container, a second run must change nothing, `--check` must see a manual change · `test/db-roundtrip.sh` backs up and restores a throwaway TimescaleDB and a Mosquitto store |
+| push to `production` (outside `wiki/`), or a manual run of `deploy` on `production` | encrypted backup → `ansible --check --diff` → `ansible apply` (with its own smoke test) → smoke test from outside |
+
+The `development` → `production` PR runs no checks of its own: its head is the `development` tip, which the push run already checked. A newer PR commit or `development` push cancels the older CI run.
 
 **Backup before every deploy.** The runner asks the server for a tar.gz (`/etc`, `/opt/rmx-vps` with its secrets and Mosquitto's `store/`, and a `pg_dump` of the `app` database when `db` runs; the raw `app/data/db` folder is skipped, `app/.env` and `app/firmware/` are included), encrypts it with `age` and uploads it as an artifact kept for 7 days. The server never sees the private key. Download one from the run's page, then on the PC: `age -d -i key.txt rmx-backup-xxxxxxx.tar.gz.age > backup.tar.gz`. Changes between the last deploy and a wipe are not in it.
 

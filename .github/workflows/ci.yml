@@ -1,15 +1,30 @@
-name: ansible
+# Checks the playbook: syntax, ansible-lint, vault encrypted, a database backup/restore round trip,
+# and the whole server built from empty in a container.
+# Runs on PRs to development (the gate before merge) and on pushes to development (tests the merge
+# commit, so the development tip has results). The development -> production PR's head is that tip,
+# so its required checks (`check`, `db-roundtrip`, `container`) are already green: no run of its own.
+# No path filters, or a tip could lack results and block the production PR.
+name: ci
 
 on:
   pull_request:
+    branches: [development]
   push:
-    branches: [development, production]
+    branches: [development]
+
+# A newer commit on the same PR or a newer development push cancels the older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   check:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: The vault, if present, is encrypted
         run: |
@@ -32,7 +47,7 @@ jobs:
   db-roundtrip:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sudo ansible/test/db-roundtrip.sh
 
   # The whole server from empty in a container; a second run must change nothing.
@@ -40,5 +55,5 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: ansible/test/container-test.sh
