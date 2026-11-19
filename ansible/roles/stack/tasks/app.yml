@@ -1,6 +1,6 @@
 # The app's server-only files, its firmware folders and the deploy
 # script (wiki Server-Infra §10 "App"). The containers start with the rest of the
-# stack (main.yml); the old probe is removed by probe-cleanup.yml.
+# stack (main.yml).
 
 # On the first deploy, --check can't preview steps that write into files and
 # folders this role creates (they don't exist yet in check mode). Remember
