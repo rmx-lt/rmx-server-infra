@@ -8,21 +8,16 @@ set -euo pipefail
 
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 NAME=rmx-test
-IMAGE=rmx-test-base
+IMAGE=${BASE_IMAGE:-rmx-test-base}
 LOG=$(mktemp)
 trap 'docker rm -f -v "$NAME" >/dev/null 2>&1 || true; rm -f "$LOG"' EXIT
 
 ct() { docker exec "$NAME" bash -c "$*"; }
 
-docker build -q -t "$IMAGE" - >/dev/null <<'DOCKERFILE'
-FROM ubuntu:24.04
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update -qq && apt-get install -y -qq systemd systemd-sysv dbus sudo git curl ca-certificates \
-    python3 python3-apt ansible-core iproute2 iptables kmod openssh-server >/dev/null \
- && apt-get clean
-STOPSIGNAL SIGRTMIN+3
-CMD ["/sbin/init"]
-DOCKERFILE
+# CI builds the base image with a layer cache and passes it in BASE_IMAGE.
+if [[ -z ${BASE_IMAGE:-} ]]; then
+	docker build -q -t "$IMAGE" -f "$REPO/ansible/test/base.Dockerfile" "$REPO/ansible/test" >/dev/null
+fi
 
 docker rm -f -v "$NAME" >/dev/null 2>&1 || true
 docker run -d --name "$NAME" --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
