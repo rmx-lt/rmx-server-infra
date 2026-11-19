@@ -45,65 +45,6 @@
     path: "{{ services_dir }}/app/jobs"
     state: absent
 
-# The gateway images used to live in caddy/firmware/probe, and after that
-# loose in app/firmware. Move them into app/firmware/gateway. Both moves do
-# nothing when the old place has no *.bin (a second run, a fresh server), and
-# `mv -n` never overwrites an image that is already in gateway/. stat first so
-# --check on a host that has no old folder does not fail.
-- name: Old firmware folder
-  ansible.builtin.stat:
-    path: "{{ services_dir }}/caddy/firmware/probe"
-  register: old_firmware_dir
-
-- name: Old firmware images
-  ansible.builtin.find:
-    paths: "{{ services_dir }}/caddy/firmware/probe"
-    patterns: ["*.bin"]
-    file_type: file
-    follow: false
-  register: old_firmware_files
-  when: old_firmware_dir.stat.isdir | default(false)
-
-- name: Move the old firmware images to app/firmware/gateway
-  ansible.builtin.command:
-    argv: [mv, -n, "{{ item.path }}", "{{ services_dir }}/app/firmware/gateway/"]
-  loop: "{{ old_firmware_files.files | default([]) }}"
-  loop_control:
-    label: "{{ item.path | basename }}"
-  changed_when: true
-
-# rmdir only removes an empty folder; anything left in it stays and shows up
-# as "not empty" (not an error: the folder was not ours to delete).
-- name: Remove the empty old firmware folders
-  ansible.builtin.command:
-    argv: [rmdir, "{{ item }}"]
-  loop:
-    - "{{ services_dir }}/caddy/firmware/probe"
-    - "{{ services_dir }}/caddy/firmware"
-  register: old_firmware_rmdir
-  changed_when: old_firmware_rmdir.rc == 0
-  failed_when: false
-  when: old_firmware_dir.stat.isdir | default(false)
-
-# Images loose in app/firmware, one level above where the app now looks.
-# find without `recurse` sees only that level, never gateway/ or autopilot/.
-- name: Loose firmware images
-  ansible.builtin.find:
-    paths: "{{ services_dir }}/app/firmware"
-    patterns: ["*.bin"]
-    file_type: file
-    follow: false
-  register: loose_firmware_files
-  when: not ansible_check_mode or app_data_before.stat.exists
-
-- name: Move the loose firmware images to app/firmware/gateway
-  ansible.builtin.command:
-    argv: [mv, -n, "{{ item.path }}", "{{ services_dir }}/app/firmware/gateway/"]
-  loop: "{{ loose_firmware_files.files | default([]) }}"
-  loop_control:
-    label: "{{ item.path | basename }}"
-  changed_when: true
-
 # The app is uid 65532 and is not in the admin group. The folders stay 0755
 # (other can traverse). An scp upload can be owner-only; make the files
 # world-readable.
