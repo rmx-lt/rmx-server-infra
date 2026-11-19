@@ -449,7 +449,7 @@ Check the certificates from the PC: `curl.exe -vI https://rmx.lt` (Windows curl 
 | `db` | `timescale/timescaledb:2.30.2-pg17` | `rmx_backend` | `mem_limit 256m` (~60 MB used) | No ports. User and database `app`. Tuned small: `shared_buffers=32MB`, `work_mem=2MB`, `max_connections=20`, no parallel workers, `timescaledb.max_background_workers=3`, `timescaledb.telemetry_level=off`. Data in `app/data/db/` |
 | `app` | `ghcr.io/rmx-lt/rmx-server-app:${APP_TAG}` | `rmx_edge` + `rmx_backend` | `mem_limit 64m` | No ports; Caddy proxies to `app:8080`. Health check every 5 s (`/app/rmx-server healthcheck`, i.e. `GET /health`). A static Go binary on `distroless/static`, `GOMEMLIMIT=40MiB` inside the 64 MB limit. Environment: `DATABASE_URL`, `MQTT_HOST=mosquitto`, `MQTT_PORT=1883`, `MQTT_USERNAME=app`, `MQTT_PASSWORD`, `ALLOWED_ORIGINS=https://app.rmx.lt`, `LOG_LEVEL=info`, `FIRMWARE_DIR=/firmware`, and `NTRIP_HOST`, `NTRIP_PORT`, `NTRIP_MOUNTPOINT`, `NTRIP_USER`, `NTRIP_PASSWORD` (from `app/.env`, empty = no caster; see [NTRIP settings](#ntrip-settings)). `BIND_ADDR` and `STATIC_DIR` are set in the image; `MQTT_CLIENT_ID`, `MQTT_TOPIC_PREFIX` and `DB_MAX_CONNECTIONS` use the app's defaults |
 
-> **The app and its database are always on.** Do not stop `app` or `db` unless the owner asks. The old probe's database in `services/probe/data` is no longer used or backed up as a database; it was deleted on 2026-11-14.
+> **The app and its database are always on.** Do not stop `app` or `db` unless the owner asks.
 
 **Where the values come from** (all server only, gitignored). Compose reads `app/.env` automatically for the included `app/compose.yaml`, because it sits next to it. If it is missing, only `app` and `db` fail, and the rest of the stack keeps working. That's also why the compose files use no `${VAR:?}` checks.
 
@@ -511,8 +511,6 @@ docker compose stop app db            # only when the owner asks; name the servi
 ```
 
 ⚠️ Don't use `docker compose stop` or `down` without service names: that stops Caddy and Mosquitto too.
-
-**Cleanup of the old probe.** Every play removes the old `probe-app` and `probe-db` containers (found by their Compose labels, project `rmx`), `/usr/local/sbin/rmx-deploy-probe` and its lock file. It never runs `docker compose down`. History that stays: `/var/log/rmx-deploy-probe.log`. The old database folder `services/probe` was deleted by hand on 2026-11-14.
 
 #### Auto-deploy (CD)
 

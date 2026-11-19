@@ -13,9 +13,6 @@
 - name: App files
   ansible.builtin.import_tasks: app.yml
 
-- name: Remove the old probe
-  ansible.builtin.import_tasks: probe-cleanup.yml
-
 # Caddy first: it fetches the certificate Mosquitto needs to start.
 - name: Start Caddy
   ansible.builtin.command: docker compose up -d caddy

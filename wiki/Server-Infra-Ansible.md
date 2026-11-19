@@ -9,7 +9,7 @@ An empty Ubuntu 24.04 VPS becomes RMX-SERVER with one command. The playbook desc
 | `ssh` | sshd: keys only, no root except from the provider dashboard, host keys from the vault |
 | `firewall` | ufw: only the ports in `group_vars/all/vars.yml` (`public_ports`); fail2ban |
 | `docker` | Docker Engine + Compose from Docker's apt repo (key fingerprint checked) |
-| `stack` | the clone in `/opt/rmx-vps`, the secrets of Caddy / Mosquitto / the app, the old probe's removal, cert-sync timer, deploy script, `docker compose up` (which starts the app and its database), the app logins, then a smoke test |
+| `stack` | the clone in `/opt/rmx-vps`, the secrets of Caddy / Mosquitto / the app, cert-sync timer, deploy script, `docker compose up` (which starts the app and its database), the app logins, then a smoke test |
 
 Everything [Server-Infra](Server-Infra) §3–§10 did by hand is in these roles. Settings that aren't secret are in [`group_vars/all/vars.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/ansible/group_vars/all/vars.yml); secrets are in `group_vars/all/vault.yml`, encrypted.
 
@@ -102,7 +102,6 @@ The `development` → `production` PR runs no checks of its own: its head is the
 - Remove things you delete from the playbook. A deleted task leaves its result on the server; add an explicit `state: absent` first, or reinstall.
 - Passwords of existing Mosquitto logins: it adds missing logins only (salted hashes can't be compared). To change one, edit the vault and run with `-e reset_mqtt_passwords=true`.
 - App: the database password only takes effect when the database is first created; a login in `vault_app_users` is created when it doesn't exist yet and never changed (use `set-password`, see [Server-Infra](Server-Infra) §10).
-- The old probe's data: the play removes the probe containers, its deploy script and lock, but not `/var/log/rmx-deploy-probe.log` (history). The old database `services/probe` was deleted by hand on 2026-11-14.
 
 ## Test it without risk
 
