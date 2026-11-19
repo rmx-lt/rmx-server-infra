@@ -56,4 +56,18 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+      - run: echo "MONTH=$(date +%Y-%m)" >>"$GITHUB_ENV"
+      # The base image (OS + apt packages) from the Actions cache; the playbook still builds the server from empty.
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: ansible/test
+          file: ansible/test/base.Dockerfile
+          build-args: REFRESH=${{ env.MONTH }}
+          tags: rmx-test-base
+          load: true
+          cache-from: type=gha,scope=container-base
+          cache-to: type=gha,mode=max,scope=container-base
       - run: ansible/test/container-test.sh
+        env:
+          BASE_IMAGE: rmx-test-base
