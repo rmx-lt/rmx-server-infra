@@ -57,17 +57,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: echo "MONTH=$(date +%Y-%m)" >>"$GITHUB_ENV"
-      # The base image (OS + apt packages) from the Actions cache; the playbook still builds the server from empty.
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/build-push-action@v7
+      # The base image (OS + apt packages) from the Actions cache, rebuilt monthly for new packages;
+      # the playbook still builds the server from empty.
+      - id: base
+        uses: actions/cache@v6
         with:
-          context: ansible/test
-          file: ansible/test/base.Dockerfile
-          build-args: REFRESH=${{ env.MONTH }}
-          tags: rmx-test-base
-          load: true
-          cache-from: type=gha,scope=container-base
-          cache-to: type=gha,mode=max,scope=container-base
+          path: /tmp/base.tar
+          key: container-base-${{ hashFiles('ansible/test/base.Dockerfile') }}-${{ env.MONTH }}
+      - if: steps.base.outputs.cache-hit == 'true'
+        run: docker load -q -i /tmp/base.tar
+      - if: steps.base.outputs.cache-hit != 'true'
+        run: |
+          docker build -q -t rmx-test-base -f ansible/test/base.Dockerfile ansible/test
+          docker save -o /tmp/base.tar rmx-test-base
       - run: ansible/test/container-test.sh
         env:
           BASE_IMAGE: rmx-test-base

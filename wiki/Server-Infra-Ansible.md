@@ -76,7 +76,7 @@ Feature branches are named `feat/<issue#>-slug`, and are deleted when their PR i
 
 | When | What runs ([`ci.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/.github/workflows/ci.yml), [`deploy.yml`](https://github.com/rmx-lt/rmx-server-infra/blob/development/.github/workflows/deploy.yml)) |
 |---|---|
-| PR to `development`, push to `development` | syntax, ansible-lint, vault encrypted · `test/container-test.sh` builds the server from empty in a container (its base image, `test/base.Dockerfile`, comes from the Actions cache and refreshes monthly), a second run must change nothing, `--check` must see a manual change · `test/db-roundtrip.sh` backs up and restores a throwaway TimescaleDB and a Mosquitto store |
+| PR to `development`, push to `development` | syntax, ansible-lint, vault encrypted · `test/container-test.sh` builds the server from empty in a container (its base image, `test/base.Dockerfile`, comes from the Actions cache, rebuilt monthly), a second run must change nothing, `--check` must see a manual change · `test/db-roundtrip.sh` backs up and restores a throwaway TimescaleDB and a Mosquitto store |
 | push to `production` (outside `wiki/`), or a manual run of `deploy` on `production` (Actions → deploy → Run workflow; a run started from another branch is skipped) | encrypted backup → `ansible --check --diff` → `ansible apply` (with its own smoke test) → smoke test from outside |
 
 The `development` → `production` PR runs no checks of its own: its head is the `development` tip, which the push run already checked. A newer PR commit or `development` push cancels the older CI run.
